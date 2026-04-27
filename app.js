@@ -186,35 +186,42 @@ function getFlagEmoji(code) {
 
 function getCountryBadge(location = "") {
   const normalizedLocation = location.toLowerCase();
+
+  const SEA_KEYWORDS = [
+    "ocean", "sea", "ridge", "trench", "offshore",
+    "mid-atlantic", "mid-indian", "mid-pacific",
+    "gulf of", "bay of", "strait", "channel",
+    "deep", "rise", "bank", "shelf", "coast",
+    "plate boundary", "fracture zone"
+  ];
+
+  if (SEA_KEYWORDS.some((kw) => normalizedLocation.includes(kw))) {
+    return {
+      emoji: "\u{1F30A}",  // 🌊
+      label: "Ocean",
+      title: "Offshore or oceanic event",
+      type: "sea"
+    };
+  }
+
   const matchedRule = COUNTRY_FLAG_RULES.find((rule) => {
     return rule.aliases.some((alias) => normalizedLocation.includes(alias));
   });
 
   if (matchedRule) {
     return {
-      emoji: getFlagEmoji(matchedRule.code),
-      label: matchedRule.code,
-      title: `Country flag: ${matchedRule.code}`
-    };
-  }
-
-  if (
-    normalizedLocation.includes("ocean") ||
-    normalizedLocation.includes("sea") ||
-    normalizedLocation.includes("ridge") ||
-    normalizedLocation.includes("trench")
-  ) {
-    return {
-      emoji: String.fromCodePoint(127754),
-      label: "Ocean",
-      title: "Offshore or oceanic event"
+      emoji: "\u{1F3D4}",  // 🏔️
+      label: "Land",
+      title: `Inland event (${matchedRule.code})`,
+      type: "land"
     };
   }
 
   return {
-    emoji: String.fromCodePoint(127757),
-    label: "Global",
-    title: "Country not identified from USGS location"
+    emoji: "\u{1F3D4}",  // 🏔️
+    label: "Land",
+    title: "Inland event — country not identified",
+    type: "unknown"
   };
 }
 
@@ -758,6 +765,7 @@ function renderCard(id, data, isTopEvent = false) {
   flag.textContent = countryBadge.emoji;
   flag.title = countryBadge.title;
   flag.setAttribute("aria-label", countryBadge.label);
+  flag.dataset.terrain = countryBadge.type ?? "unknown";
 
   const locationText = document.createElement("span");
   locationText.className = "location";
@@ -836,6 +844,7 @@ function renderDetailModal(quake) {
   flag.textContent = countryBadge.emoji;
   flag.title = countryBadge.title;
   flag.setAttribute("aria-label", countryBadge.label);
+  flag.dataset.terrain = countryBadge.type ?? "unknown";
 
   titleRow.append(flag, title);
   titleGroup.append(kicker, titleRow, subtitle);
@@ -998,6 +1007,7 @@ function renderHeroHighlight(quakes) {
   flag.textContent = countryBadge.emoji;
   flag.title = countryBadge.title;
   flag.setAttribute("aria-label", countryBadge.label);
+  flag.dataset.terrain = countryBadge.type ?? "unknown";
 
   const locationText = document.createElement("span");
   locationText.textContent = strongest.location;

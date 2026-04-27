@@ -5,6 +5,10 @@
   --bg-bottom: #0b1830;
   --glow-cyan: rgba(0, 199, 255, 0.14);
   --glow-orange: rgba(255, 108, 47, 0.14);
+  /* Red glow tokens for dark mode */
+  --glow-red-a: rgba(220, 30, 30, 0.22);
+  --glow-red-b: rgba(180, 10, 10, 0.16);
+  --glow-red-c: rgba(255, 60, 30, 0.12);
   --panel: rgba(11, 22, 40, 0.88);
   --panel-strong: rgba(16, 30, 53, 0.92);
   --panel-soft: rgba(9, 18, 34, 0.78);
@@ -46,7 +50,7 @@ body {
     radial-gradient(circle at top left, var(--glow-cyan), transparent 28%),
     radial-gradient(circle at top right, var(--glow-orange), transparent 24%),
     linear-gradient(160deg, var(--bg-top) 0%, var(--bg-mid) 45%, var(--bg-bottom) 100%);
-  transition: background 0.28s ease, color 0.28s ease;
+  transition: background 0.4s ease, color 0.28s ease;
 }
 
 body::before,
@@ -57,6 +61,7 @@ body::after {
   pointer-events: none;
 }
 
+/* Dark mode: subtle grid overlay */
 body::before {
   opacity: 0.3;
   background:
@@ -66,44 +71,81 @@ body::before {
   mask-image: radial-gradient(circle at center, black 35%, transparent 90%);
 }
 
+/* Dark mode: flowing red glows layer */
 body::after {
   background:
-    radial-gradient(circle at 15% 20%, rgba(118, 199, 255, 0.08), transparent 18%),
-    radial-gradient(circle at 82% 12%, rgba(255, 184, 77, 0.08), transparent 16%);
+    radial-gradient(ellipse at 15% 20%, rgba(118, 199, 255, 0.06), transparent 22%),
+    radial-gradient(ellipse at 82% 12%, rgba(255, 184, 77, 0.06), transparent 18%);
+  animation: redFlowDark 14s ease-in-out infinite alternate;
+}
+
+/* Extra glowing red blobs – injected via a dedicated pseudo-layer on html */
+html::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  animation: redBlob 18s ease-in-out infinite alternate;
+  background:
+    radial-gradient(ellipse 55% 38% at 72% 85%, rgba(220, 30, 30, 0.18), transparent),
+    radial-gradient(ellipse 40% 30% at 18% 70%, rgba(200, 15, 15, 0.14), transparent),
+    radial-gradient(ellipse 30% 24% at 50% 5%,  rgba(255, 50, 20, 0.1),  transparent);
 }
 
 body[data-theme="light"] {
-  --bg: #f3f7fb;
-  --bg-top: #f7fbff;
-  --bg-mid: #edf4fb;
-  --bg-bottom: #dde8f3;
-  --glow-cyan: rgba(32, 145, 220, 0.1);
-  --glow-orange: rgba(242, 126, 64, 0.12);
-  --panel: rgba(255, 255, 255, 0.84);
-  --panel-strong: rgba(247, 251, 255, 0.96);
-  --panel-soft: rgba(255, 255, 255, 0.82);
-  --panel-soft-alt: rgba(255, 255, 255, 0.76);
-  --panel-tint: rgba(17, 40, 63, 0.04);
-  --panel-tint-strong: rgba(17, 40, 63, 0.06);
-  --panel-sheen: rgba(255, 255, 255, 0.74);
-  --panel-sheen-strong: rgba(45, 130, 196, 0.14);
-  --surface-hero: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(239, 246, 252, 0.95));
-  --surface-spotlight: linear-gradient(180deg, rgba(250, 252, 255, 0.96), rgba(232, 241, 249, 0.94));
-  --surface-top-event: linear-gradient(180deg, rgba(255, 249, 237, 0.96), rgba(247, 237, 221, 0.95));
-  --surface-modal: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 246, 252, 0.98));
-  --backdrop: rgba(214, 224, 235, 0.68);
-  --panel-border: rgba(73, 104, 138, 0.18);
-  --panel-border-strong: rgba(45, 130, 196, 0.3);
-  --text: #102033;
-  --text-strong: #102033;
+  --bg: #fdf7ee;
+  --bg-top: #fff8ec;
+  --bg-mid: #faecd5;
+  --bg-bottom: #f3ddb8;
+  --glow-cyan: rgba(251, 188, 64, 0.18);
+  --glow-orange: rgba(234, 140, 30, 0.16);
+  --panel: rgba(255, 250, 240, 0.88);
+  --panel-strong: rgba(255, 253, 245, 0.97);
+  --panel-soft: rgba(255, 248, 232, 0.86);
+  --panel-soft-alt: rgba(255, 246, 225, 0.80);
+  --panel-tint: rgba(160, 90, 10, 0.04);
+  --panel-tint-strong: rgba(160, 90, 10, 0.07);
+  --panel-sheen: rgba(255, 255, 255, 0.78);
+  --panel-sheen-strong: rgba(220, 150, 40, 0.18);
+  --surface-hero: linear-gradient(180deg, rgba(255, 252, 242, 0.97), rgba(250, 236, 208, 0.97));
+  --surface-spotlight: linear-gradient(180deg, rgba(255, 253, 245, 0.97), rgba(248, 236, 212, 0.95));
+  --surface-top-event: linear-gradient(180deg, rgba(255, 245, 220, 0.97), rgba(248, 228, 190, 0.96));
+  --surface-modal: linear-gradient(180deg, rgba(255, 253, 245, 0.99), rgba(250, 238, 210, 0.99));
+  --backdrop: rgba(220, 190, 140, 0.55);
+  --panel-border: rgba(180, 130, 60, 0.18);
+  --panel-border-strong: rgba(210, 140, 30, 0.32);
+  --text: #2d1a00;
+  --text-strong: #1a0e00;
   --text-inverse: #ffffff;
-  --text-warm-inverse: #ffffff;
-  --muted: #5f7490;
-  --muted-strong: #69809d;
-  --success: #1a9d68;
-  --success-text: #14684a;
-  --accent: #1d78c1;
-  --shadow: 0 20px 45px rgba(69, 92, 121, 0.14);
+  --text-warm-inverse: #1c0e00;
+  --muted: #8a6432;
+  --muted-strong: #7a5522;
+  --success: #2a9d5c;
+  --success-text: #1a6b3f;
+  --accent: #c07a10;
+  --shadow: 0 20px 45px rgba(160, 100, 20, 0.13);
+}
+
+/* Light mode: override flowing background and remove dark red blobs */
+body[data-theme="light"] {
+  background:
+    radial-gradient(ellipse at top left,  rgba(251, 188, 64, 0.22), transparent 32%),
+    radial-gradient(ellipse at top right, rgba(234, 120, 30, 0.18), transparent 28%),
+    linear-gradient(160deg, #fff8ec 0%, #faecd5 50%, #f3ddb8 100%);
+}
+
+body[data-theme="light"]::after {
+  background:
+    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(255, 180, 50, 0.15), transparent),
+    radial-gradient(ellipse 42% 28% at 12% 75%, rgba(240, 140, 30, 0.12), transparent),
+    radial-gradient(ellipse 30% 20% at 50% 3%,  rgba(255, 215, 100, 0.14), transparent);
+  animation: amberFlowLight 16s ease-in-out infinite alternate;
+}
+
+html:has(body[data-theme="light"])::before {
+  animation: none;
+  background: none;
 }
 
 .app-shell {
@@ -445,6 +487,33 @@ body[data-theme="light"] {
   min-width: 2.35rem;
   height: 2.35rem;
   font-size: 1.15rem;
+}
+
+/* Sea / offshore events — blue wave tint */
+.flag-badge[data-terrain="sea"] {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(14, 116, 189, 0.18);
+  box-shadow:
+    inset 0 -1px 0 rgba(56, 189, 248, 0.12),
+    0 0 8px rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+}
+
+/* Identified country / on-land events — green-earth tint */
+.flag-badge[data-terrain="land"] {
+  border-color: rgba(74, 189, 120, 0.28);
+  background: rgba(22, 120, 68, 0.15);
+  box-shadow:
+    inset 0 -1px 0 rgba(74, 189, 120, 0.1),
+    0 0 6px rgba(74, 189, 120, 0.14);
+}
+
+/* Unidentified inland — warm neutral tint */
+.flag-badge[data-terrain="unknown"] {
+  border-color: rgba(180, 140, 80, 0.28);
+  background: rgba(140, 100, 40, 0.14);
+  box-shadow: inset 0 -1px 0 rgba(180, 140, 80, 0.1);
+  color: #d4a96a;
 }
 
 .ticker-pill::after {
@@ -1401,6 +1470,31 @@ body[data-theme="light"] {
   border-radius: 18px;
   background: rgba(118, 199, 255, 0.08);
   font-size: 1.45rem;
+  box-shadow: inset 0 -1px 0 var(--panel-tint);
+}
+
+.detail-flag[data-terrain="sea"] {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(14, 116, 189, 0.18);
+  box-shadow:
+    inset 0 -1px 0 rgba(56, 189, 248, 0.12),
+    0 0 8px rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+}
+
+.detail-flag[data-terrain="land"] {
+  border-color: rgba(74, 189, 120, 0.28);
+  background: rgba(22, 120, 68, 0.15);
+  box-shadow:
+    inset 0 -1px 0 rgba(74, 189, 120, 0.1),
+    0 0 6px rgba(74, 189, 120, 0.14);
+}
+
+.detail-flag[data-terrain="unknown"] {
+  border-color: rgba(180, 140, 80, 0.28);
+  background: rgba(140, 100, 40, 0.14);
+  box-shadow: inset 0 -1px 0 rgba(180, 140, 80, 0.1);
+  color: #d4a96a;
 }
 
 .detail-subtitle {
@@ -1681,5 +1775,88 @@ body[data-theme="light"] {
   .toast-stack {
     right: 0.8rem;
     bottom: 5rem;
+  }
+}
+
+/* =====================================================================
+   Background animation keyframes
+   ===================================================================== */
+
+/* Dark mode: body::after — faint cyan/orange accents shift, red blobs lead */
+@keyframes redFlowDark {
+  0%   { opacity: 0.9; transform: scale(1)    translateY(0px); }
+  30%  { opacity: 1;   transform: scale(1.04) translateY(-8px); }
+  60%  { opacity: 0.85; transform: scale(0.97) translateY(6px); }
+  100% { opacity: 1;   transform: scale(1.06) translateY(-4px); }
+}
+
+/* Dark mode: html::before — the glowing red blobs that breathe and shift */
+@keyframes redBlob {
+  0% {
+    background:
+      radial-gradient(ellipse 55% 38% at 72% 85%, rgba(220, 30, 30, 0.18), transparent),
+      radial-gradient(ellipse 40% 30% at 18% 70%, rgba(200, 15, 15, 0.14), transparent),
+      radial-gradient(ellipse 30% 24% at 50%  5%, rgba(255, 50, 20, 0.10), transparent);
+    filter: blur(0px);
+  }
+  20% {
+    background:
+      radial-gradient(ellipse 60% 42% at 80% 78%, rgba(230, 20, 20, 0.22), transparent),
+      radial-gradient(ellipse 36% 26% at 22% 62%, rgba(210, 10, 10, 0.16), transparent),
+      radial-gradient(ellipse 34% 28% at 45% 10%, rgba(255, 60, 30, 0.13), transparent);
+    filter: blur(2px);
+  }
+  40% {
+    background:
+      radial-gradient(ellipse 48% 36% at 65% 92%, rgba(200, 40, 40, 0.15), transparent),
+      radial-gradient(ellipse 44% 32% at 12% 80%, rgba(220, 20, 10, 0.18), transparent),
+      radial-gradient(ellipse 26% 20% at 55%  2%, rgba(240, 40, 10, 0.09), transparent);
+    filter: blur(0px);
+  }
+  60% {
+    background:
+      radial-gradient(ellipse 58% 44% at 76% 88%, rgba(215, 25, 25, 0.20), transparent),
+      radial-gradient(ellipse 38% 28% at 20% 65%, rgba(195, 12, 12, 0.15), transparent),
+      radial-gradient(ellipse 32% 22% at 48%  7%, rgba(255, 45, 15, 0.11), transparent);
+    filter: blur(1px);
+  }
+  80% {
+    background:
+      radial-gradient(ellipse 52% 40% at 70% 82%, rgba(225, 35, 35, 0.16), transparent),
+      radial-gradient(ellipse 42% 30% at 16% 74%, rgba(205, 18, 18, 0.13), transparent),
+      radial-gradient(ellipse 28% 26% at 52%  4%, rgba(250, 55, 25, 0.10), transparent);
+    filter: blur(3px);
+  }
+  100% {
+    background:
+      radial-gradient(ellipse 62% 38% at 74% 80%, rgba(235, 15, 15, 0.22), transparent),
+      radial-gradient(ellipse 36% 28% at 20% 68%, rgba(210, 10, 10, 0.17), transparent),
+      radial-gradient(ellipse 30% 22% at 50%  6%, rgba(255, 50, 20, 0.12), transparent);
+    filter: blur(0px);
+  }
+}
+
+/* Light mode: body::after — warm amber shimmer */
+@keyframes amberFlowLight {
+  0% {
+    background:
+      radial-gradient(ellipse 60% 40% at 80% 90%, rgba(255, 180, 50, 0.15), transparent),
+      radial-gradient(ellipse 42% 28% at 12% 75%, rgba(240, 140, 30, 0.12), transparent),
+      radial-gradient(ellipse 30% 20% at 50%  3%, rgba(255, 215, 100, 0.14), transparent);
+    filter: blur(0px);
+  }
+  40% {
+    background:
+      radial-gradient(ellipse 65% 44% at 85% 84%, rgba(255, 190, 60, 0.18), transparent),
+      radial-gradient(ellipse 38% 24% at  8% 70%, rgba(235, 130, 20, 0.14), transparent),
+      radial-gradient(ellipse 34% 24% at 48%  8%, rgba(255, 220, 110, 0.16), transparent);
+    filter: blur(2px);
+  }
+  100% {
+    background:
+      radial-gradient(ellipse 55% 36% at 78% 86%, rgba(255, 170, 40, 0.13), transparent),
+      radial-gradient(ellipse 46% 32% at 14% 78%, rgba(245, 150, 35, 0.15), transparent),
+      radial-gradient(ellipse 28% 18% at 52%  2%, rgba(255, 210, 90, 0.12), transparent);
+    filter: blur(1px);
   }
 }
