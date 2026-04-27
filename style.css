@@ -44,7 +44,7 @@ body {
   position: relative;
   margin: 0;
   min-height: 100vh;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top left, var(--glow-cyan), transparent 28%),
@@ -159,12 +159,13 @@ html:has(body[data-theme="light"])::before {
   display: grid;
   grid-template-columns: 1.5fr minmax(260px, 360px);
   gap: 1.25rem;
-  padding: 2rem;
-  border: 1px solid var(--panel-border);
-  border-radius: 28px;
+  padding: 2.5rem;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 32px;
   background: var(--surface-hero);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .hero-copy,
@@ -180,10 +181,50 @@ html:has(body[data-theme="light"])::before {
   color: var(--accent);
 }
 
-.app-header h1 {
+.main-title {
   margin: 0;
-  line-height: 1.12;
-  font-size: clamp(1.9rem, 4vw, 3.2rem);
+  line-height: 1.15;
+  font-size: clamp(2.2rem, 4.5vw, 3.6rem);
+  font-family: "Outfit", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.brand-globe {
+  display: inline-block;
+  animation: floatGlobe 4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+@keyframes floatGlobe {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-4px) rotate(4deg); }
+}
+
+.brand-highlight {
+  background: linear-gradient(120deg, #38bdf8, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+  position: relative;
+}
+
+body[data-theme="light"] .brand-highlight {
+  background: linear-gradient(120deg, #f59e0b, #ef4444, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.title-separator {
+  color: var(--muted);
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Outfit", system-ui, sans-serif;
 }
 
 .subtitle {
@@ -194,10 +235,21 @@ html:has(body[data-theme="light"])::before {
 }
 
 .hero-spotlight {
-  padding: 1.2rem;
-  border: 1px solid var(--panel-border);
-  border-radius: 22px;
+  padding: 1.5rem;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 26px;
   background: var(--surface-spotlight);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-spotlight::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at top right, rgba(255,255,255,0.06), transparent 50%);
+  pointer-events: none;
 }
 
 .spotlight-label {
