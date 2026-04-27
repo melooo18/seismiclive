@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SeismicLive</title>
+  <link rel="stylesheet" href="./style.css" />
+  <!-- Leaflet map styles -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+</head>
+<body>
+  <!-- Main app container -->
+  <div class="app-shell">
+    <!-- Header section shown at the top of the dashboard -->
+    <header class="app-header">
+      <div class="hero-copy">
+        <p class="eyebrow">Live seismic activity feed</p>
+        <h1>&#127757; SeismicLive / Real-time global earthquake monitor</h1>
+        <p class="subtitle">
+          Showing recent earthquakes from the USGS live feed, with a special
+          focus mode for the Philippine region.
+        </p>
+      </div>
+
+      <!-- Spotlight panel for the strongest event currently on screen -->
+      <aside class="hero-spotlight">
+        <p class="spotlight-label">Strongest event</p>
+        <div id="hero-highlight" class="hero-highlight">
+          <p class="spotlight-empty">Waiting for earthquake data...</p>
+        </div>
+      </aside>
+    </header>
+
+    <!-- Quick status note for students testing the project -->
+    <section class="status-panel">
+      <span class="status-dot"></span>
+      <p id="live-status-copy">
+        SeismicLive now tracks more recent quakes and can narrow the dashboard
+        to the Philippine area in one click.
+      </p>
+      <span id="live-status-tag" class="status-tag">Auto refresh on</span>
+    </section>
+
+    <!-- Live ticker gives the dashboard a constantly moving activity surface -->
+    <section class="ticker-shell" aria-label="Live earthquake ticker">
+      <p class="ticker-label">Live tape</p>
+      <div class="ticker-track">
+        <div id="ticker-content" class="ticker-content">
+          <span class="ticker-empty">Waiting for live earthquake activity...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Summary cards provide an at-a-glance view of the latest activity -->
+    <section id="overview-grid" class="overview-grid" aria-label="Earthquake overview">
+      <button class="overview-card overview-button" data-metric-action="reset" type="button">
+        <p class="overview-label">Tracked events</p>
+        <p id="metric-total" class="overview-value">0</p>
+        <p class="overview-meta">Reset the board view</p>
+      </button>
+      <button class="overview-card overview-button" data-metric-action="minor" type="button">
+        <p class="overview-label">Average magnitude</p>
+        <p id="metric-average" class="overview-value">0.0</p>
+        <p class="overview-meta">Jump to M 3+ activity</p>
+      </button>
+      <button class="overview-card overview-button" data-metric-action="strong" type="button">
+        <p class="overview-label">High severity</p>
+        <p id="metric-severe" class="overview-value">0</p>
+        <p class="overview-meta">Filter to M 5+ events</p>
+      </button>
+      <button class="overview-card overview-button" data-metric-action="philippines" type="button">
+        <p class="overview-label">Philippine area</p>
+        <p id="metric-ph" class="overview-value">0</p>
+        <p class="overview-meta">Focus the regional feed</p>
+      </button>
+    </section>
+
+    <section class="trends-panel" aria-label="Earthquake trends">
+      <div class="section-heading">
+        <div>
+          <p class="section-eyebrow">Quick trends</p>
+          <h2 class="section-title">Current feed pulse</h2>
+        </div>
+        <p class="section-copy">
+          Fast stats for the current filtered view so it is easier to spot fresh activity and stronger clusters.
+        </p>
+      </div>
+      <div id="trends-grid" class="trends-grid">
+        <article class="trend-card">
+          <p class="trend-label">Past hour</p>
+          <p class="trend-value">0</p>
+          <p class="trend-meta">Waiting for live data...</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Toolbar gives users control over region, magnitude, search, and syncing -->
+    <section class="toolbar" aria-label="Dashboard controls">
+      <div class="toolbar-stack">
+        <div class="filter-group" role="group" aria-label="Region filters">
+          <button class="region-chip" data-region="philippines" type="button">
+            Philippines Focus
+          </button>
+          <button class="region-chip is-active" data-region="global" type="button">
+            Global View
+          </button>
+        </div>
+
+        <div class="filter-group" role="group" aria-label="Magnitude filters">
+          <button class="filter-chip is-active" data-filter="all" type="button">All</button>
+          <button class="filter-chip" data-filter="minor" type="button">M 3+</button>
+          <button class="filter-chip" data-filter="strong" type="button">M 5+</button>
+          <button class="filter-chip" data-filter="major" type="button">M 7+</button>
+        </div>
+      </div>
+
+      <label class="search-wrap" for="search-input">
+        <span class="search-topline">
+          <span class="search-label">Search location</span>
+          <span class="search-hint">Press / to focus</span>
+        </span>
+        <input
+          id="search-input"
+          class="search-input"
+          type="search"
+          placeholder="Filter by place or region"
+          autocomplete="off"
+        />
+        <button id="clear-search-button" class="clear-search-button" type="button" hidden>
+          Clear search
+        </button>
+      </label>
+
+      <label class="sort-wrap" for="sort-select">
+        <span class="search-topline">
+          <span class="search-label">Sort feed</span>
+          <span class="search-hint">Change card order</span>
+        </span>
+        <select id="sort-select" class="sort-select">
+          <option value="newest">Newest first</option>
+          <option value="strongest">Strongest first</option>
+          <option value="shallowest">Shallowest first</option>
+          <option value="regional">Closest regional match</option>
+        </select>
+      </label>
+
+      <button id="sync-button" class="sync-button" type="button">
+        Refresh feed
+      </button>
+    </section>
+
+    <!-- Interactive map showing recent earthquake locations -->
+    <section id="map-section" class="map-section" aria-label="Earthquake map" role="region">
+      <div id="map" class="map-container" role="application" aria-label="Interactive earthquake map" tabindex="0" aria-describedby="map-legend"></div>
+      <div id="map-legend" class="map-legend" aria-hidden="false">
+        <p class="map-legend-title">Magnitude</p>
+        <ul>
+          <li><span class="legend-swatch mag-7"></span> M 7+</li>
+          <li><span class="legend-swatch mag-5"></span> M 5-6.9</li>
+          <li><span class="legend-swatch mag-3"></span> M 3-4.9</li>
+          <li><span class="legend-swatch mag-0"></span> M &lt;3</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Quake cards are injected into this container by app.js -->
+    <main id="alert-wall" class="alert-wall" aria-live="polite">
+      <div class="empty-state">Loading recent earthquake activity...</div>
+    </main>
+  </div>
+
+    <!-- Floating utility dock keeps settings accessible without taking dashboard space -->
+  <div class="floating-utility-stack" aria-label="Settings and database tools">
+    <details class="settings-panel utility-flyout">
+      <summary class="settings-summary">
+        <span class="utility-summary-icon" aria-hidden="true">🗂</span>
+        <span class="utility-summary-label">Database</span>
+      </summary>
+
+      <section class="settings-card">
+        <h2 class="settings-title">Cleanup Firestore</h2>
+        <p class="settings-copy utility-copy">
+          Remove older earthquake records from Firestore to keep the project
+          database smaller and easier to manage.
+        </p>
+        <div class="settings-actions">
+          <button class="settings-action danger-action" data-cleanup="7" type="button">
+            Delete older than 7 days
+          </button>
+          <button class="settings-action danger-action" data-cleanup="30" type="button">
+            Delete older than 30 days
+          </button>
+          <button class="settings-action danger-action" data-cleanup="90" type="button">
+            Delete older than 90 days
+          </button>
+          <button class="settings-action clear-action" data-cleanup="all" type="button">
+            Delete all stored quakes
+          </button>
+        </div>
+
+        <label class="settings-field" for="retention-days-select">
+          <span class="settings-label">Automatic retention</span>
+          <select id="retention-days-select" class="settings-select">
+            <option value="7">Keep only 7 days</option>
+            <option value="14">Keep only 14 days</option>
+            <option value="30" selected>Keep only 30 days</option>
+            <option value="90">Keep only 90 days</option>
+          </select>
+        </label>
+
+        <label class="settings-field" for="max-docs-select">
+          <span class="settings-label">Maximum stored quake docs</span>
+          <select id="max-docs-select" class="settings-select">
+            <option value="100">100 docs</option>
+            <option value="250">250 docs</option>
+            <option value="500" selected>500 docs</option>
+            <option value="1000">1000 docs</option>
+          </select>
+        </label>
+
+        <label class="settings-field" for="min-mag-select">
+          <span class="settings-label">Minimum magnitude to store</span>
+          <select id="min-mag-select" class="settings-select">
+            <option value="0">Store all magnitudes</option>
+            <option value="1.5">Store M 1.5+</option>
+            <option value="2.5" selected>Store M 2.5+</option>
+            <option value="4">Store M 4.0+</option>
+          </select>
+        </label>
+
+        <label class="settings-field" for="storage-scope-select">
+          <span class="settings-label">Storage scope</span>
+          <select id="storage-scope-select" class="settings-select">
+            <option value="global" selected>Store global quakes</option>
+            <option value="philippines">Store Philippine-area quakes only</option>
+          </select>
+        </label>
+      </section>
+    </details>
+
+    <details class="settings-panel utility-flyout">
+      <summary class="settings-summary">
+        <span class="utility-summary-icon" aria-hidden="true">⚙</span>
+        <span class="utility-summary-label">Settings</span>
+      </summary>
+
+      <section class="settings-card">
+        <h2 class="settings-title">Dashboard Preferences</h2>
+        <p class="settings-copy utility-copy">
+          Save how SeismicLive behaves when you reopen it.
+        </p>
+
+        <label class="settings-field" for="default-region-select">
+          <span class="settings-label">Default region view</span>
+          <select id="default-region-select" class="settings-select">
+            <option value="global">Global View</option>
+            <option value="philippines">Philippines Focus</option>
+          </select>
+        </label>
+
+        <label class="settings-field" for="notification-threshold-select">
+          <span class="settings-label">Notify for magnitude >=</span>
+          <select id="notification-threshold-select" class="settings-select">
+            <option value="0">Off</option>
+            <option value="3">M 3+</option>
+            <option value="4">M 4+</option>
+            <option value="5" selected>M 5+</option>
+            <option value="6">M 6+</option>
+          </select>
+        </label>
+
+        <label class="settings-toggle">
+          <input id="auto-sync-toggle" type="checkbox" checked />
+          <span>Enable automatic USGS refresh every 5 minutes</span>
+        </label>
+
+        <div class="settings-actions">
+          <button id="reset-filters-button" class="settings-action" type="button">
+            Reset filters
+          </button>
+        </div>
+      </section>
+    </details>
+  </div>
+
+  <!-- Detail modal opens when a user clicks a quake card -->
+  <div id="detail-modal" class="detail-modal" hidden>
+    <div id="detail-backdrop" class="detail-backdrop"></div>
+    <section
+      id="detail-panel"
+      class="detail-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="detail-title"
+    >
+      <button id="detail-close" class="detail-close" type="button" aria-label="Close details">
+        Close
+      </button>
+      <div id="detail-content" class="detail-content">
+        <p class="detail-empty">Select an earthquake card to view more details.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Toasts provide lightweight feedback when new quakes arrive or actions succeed -->
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Floating theme switch stays visible while scrolling -->
+  <button
+    id="theme-toggle-button"
+    class="theme-toggle-button"
+    type="button"
+    aria-label="Switch to light mode"
+  >
+    <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true"></span>
+    <span class="theme-toggle-icon theme-toggle-moon" aria-hidden="true"></span>
+  </button>
+
+  <!-- Main app logic loaded as an ES module -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

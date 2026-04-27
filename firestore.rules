@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /quakes/{quakeId} {
+      allow read: if true;
+
+      // Recommended production stance:
+      // keep public reads open for the dashboard, but require an admin identity
+      // for writes so the project does not become an open-write database.
+      allow create, update, delete: if request.auth != null
+        && request.auth.token.admin == true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
