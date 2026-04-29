@@ -175,6 +175,156 @@ export function buildTrendSummary(quakes, now = Date.now()) {
   };
 }
 
+function getAverageMagnitude(quakes) {
+  if (!quakes.length) {
+    return 0;
+  }
+
+  return quakes.reduce((sum, quake) => sum + (quake.magnitude || 0), 0) / quakes.length;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getPercentChange(current, previous) {
+  if (previous <= 0) {
+    return current > 0 ? 1 : 0;
+  }
+
+  return (current - previous) / previous;
+}
+
+function formatPercentChange(change) {
+  if (!Number.isFinite(change) || Math.abs(change) < 0.01) {
+    return "Flat";
+  }
+
+  const percent = Math.round(Math.abs(change) * 100);
+  return `${change > 0 ? "+" : "-"}${percent}%`;
+}
+
+function getRegionBucket(location = "") {
+  if (!location) {
+    return "Unknown zone";
+  }
+
+  const parts = location
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return parts[parts.length - 1];
+  }
+
+  return truncateLocation(location, 24);
+}
+
+export function buildPredictiveInsights(quakes, now = Date.now()) {
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+  const sixHoursAgo = now - 6 * 60 * 60 * 1000;
+  const twelveHoursAgo = now - 12 * 60 * 60 * 1000;
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+  const lastHourQuakes = quakes.filter((quake) => getQuakeTimestampMs(quake.time) >= oneHourAgo);
+  const previousHourQuakes = quakes.filter((quake) => {
+    const timeMs = getQuakeTimestampMs(quake.time);
+    return timeMs < oneHourAgo && timeMs >= twoHoursAgo;
+  });
+  const lastSixHourQuakes = quakes.filter((quake) => getQuakeTimestampMs(quake.time) >= sixHoursAgo);
+  const previousSixHourQuakes = quakes.filter((quake) => {
+    const timeMs = getQuakeTimestampMs(quake.time);
+    return timeMs < sixHoursAgo && timeMs >= twelveHoursAgo;
+  });
+  const lastDayQuakes = quakes.filter((quake) => getQuakeTimestampMs(quake.time) >= oneDayAgo);
+  const recentStrongCount = lastSixHourQuakes.filter((quake) => (quake.magnitude || 0) >= 5).length;
+  const recentMajorCount = lastDayQuakes.filter((quake) => (quake.magnitude || 0) >= 6).length;
+  const hourlyAcceleration = getPercentChange(
+    lastHourQuakes.length,
+    previousHourQuakes.length
+  );
+  const sixHourMomentum = getPercentChange(
+    lastSixHourQuakes.length,
+    previousSixHourQuakes.length
+  );
+  const averageRecentMagnitude = getAverageMagnitude(lastSixHourQuakes);
+
+  const riskScore = clamp(
+    Math.round(
+      lastHourQuakes.length * 14 +
+      lastSixHourQuakes.length * 4 +
+      recentStrongCount * 18 +
+      recentMajorCount * 12 +
+      Math.max(hourlyAcceleration, 0) * 25 +
+      Math.max(sixHourMomentum, 0) * 20 +
+      averageRecentMagnitude * 4
+    ),
+    quakes.length ? 8 : 0,
+    99
+  );
+
+  let outlook = "Quiet";
+
+  if (!quakes.length) {
+    outlook = "Waiting";
+  } else if (
+    riskScore >= 75 ||
+    recentStrongCount >= 2 ||
+    (hourlyAcceleration >= 0.6 && lastSixHourQuakes.length >= 6)
+  ) {
+    outlook = "Escalating";
+  } else if (riskScore >= 55) {
+    outlook = "Elevated";
+  } else if (riskScore >= 35) {
+    outlook = "Active";
+  } else if (sixHourMomentum <= -0.35 && lastSixHourQuakes.length < previousSixHourQuakes.length) {
+    outlook = "Cooling";
+  } else {
+    outlook = "Steady";
+  }
+
+  let confidence = "Low";
+
+  if (lastDayQuakes.length >= 18 && previousHourQuakes.length + lastHourQuakes.length >= 4) {
+    confidence = "High";
+  } else if (lastDayQuakes.length >= 8) {
+    confidence = "Moderate";
+  }
+
+  const hotspotBuckets = lastDayQuakes.reduce((counts, quake) => {
+    const bucket = getRegionBucket(quake.location);
+    counts.set(bucket, (counts.get(bucket) || 0) + 1);
+    return counts;
+  }, new Map());
+
+  const sortedHotspots = Array.from(hotspotBuckets.entries()).sort((a, b) => b[1] - a[1]);
+  const hotspotEntry = sortedHotspots[0];
+  let trendDirection = "Stable";
+
+  if (hourlyAcceleration >= 0.35 || sixHourMomentum >= 0.4 || riskScore >= 70) {
+    trendDirection = "Worsening";
+  } else if (hourlyAcceleration <= -0.25 || sixHourMomentum <= -0.3) {
+    trendDirection = "Improving";
+  }
+
+  return {
+    outlook,
+    confidence,
+    trendDirection,
+    riskScore,
+    hourlyAccelerationLabel: formatPercentChange(hourlyAcceleration),
+    lastHourCount: lastHourQuakes.length,
+    lastSixHourCount: lastSixHourQuakes.length,
+    averageRecentMagnitude,
+    recentStrongCount,
+    hotspotLabel: hotspotEntry ? hotspotEntry[0] : "No cluster yet",
+    hotspotCount: hotspotEntry ? hotspotEntry[1] : 0,
+    topHotspots: sortedHotspots.slice(0, 3).map(([label, count]) => ({ label, count }))
+  };
+}
+
 export function getFreshnessSummary(lastSuccessfulFetchAt, isOffline, now = Date.now()) {
   if (!lastSuccessfulFetchAt) {
     return {

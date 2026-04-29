@@ -20,7 +20,8 @@
     <header class="app-header">
       <div class="hero-copy">
         <p class="eyebrow">Live seismic activity feed</p>
-        <h1 class="main-title"><span class="brand-globe">&#127757;</span> <span class="brand-highlight">SeismicLive</span> <span class="title-separator">/</span> Real-time global earthquake monitor</h1>
+        <h1 class="main-title"><span class="brand-globe">&#127757;</span> <span class="brand-highlight">SeismicLive</span></h1>
+        <p class="hero-tagline">Real-time global earthquake monitor</p>
         <p class="subtitle">
           Showing recent earthquakes from the USGS live feed, with a special
           focus mode for the Philippine region.
@@ -35,6 +36,78 @@
         </div>
       </aside>
     </header>
+
+    <details class="forecast-shell" aria-label="Predictive analytics summary">
+      <summary class="forecast-summary-bar">
+        <div class="forecast-summary-copy">
+          <p class="forecast-kicker">Forecast summary</p>
+          <h2 id="forecast-headline" class="forecast-headline">6-hour outlook: Waiting</h2>
+          <p id="forecast-copy" class="forecast-copy">
+            SeismicLive is analyzing recent event frequency, magnitude, and acceleration to generate an experimental short-term outlook.
+          </p>
+        </div>
+        <div class="forecast-summary-actions">
+          <div class="forecast-badge-stack">
+            <span id="forecast-chip" class="forecast-chip">Model warming up</span>
+          </div>
+          <span class="forecast-summary-toggle">Forecast details</span>
+        </div>
+      </summary>
+
+      <section class="forecast-rail">
+        <article class="forecast-hero-card">
+          <div class="forecast-chart-card" aria-label="24-hour activity trend">
+            <div class="forecast-chart-topline">
+              <p class="forecast-chart-label">24-hour activity trend</p>
+              <p id="forecast-chart-peak" class="forecast-chart-peak">Peak: --</p>
+            </div>
+            <svg
+              id="forecast-chart"
+              class="forecast-chart"
+              viewBox="0 0 320 120"
+              role="img"
+              aria-label="Hourly earthquake activity trend for the last 24 hours"
+            ></svg>
+            <div class="forecast-chart-legend" aria-hidden="true">
+              <span class="forecast-legend-item">
+                <span class="forecast-legend-swatch is-activity"></span>
+                Activity count
+              </span>
+              <span class="forecast-legend-item">
+                <span class="forecast-legend-swatch is-magnitude"></span>
+                Average magnitude
+              </span>
+            </div>
+            <div class="forecast-chart-axis" aria-hidden="true">
+              <span>24h ago</span>
+              <span>Now</span>
+            </div>
+            <p id="forecast-chart-footnote" class="forecast-chart-footnote">
+              Building the first trend line from incoming events.
+            </p>
+          </div>
+        </article>
+        <article class="forecast-side-card">
+          <p class="forecast-side-label">Model note</p>
+          <p id="forecast-rationale" class="forecast-side-copy">
+            Short-term risk is estimated from recent activity, magnitude shifts, and regional clustering.
+          </p>
+          <div class="forecast-hotspots">
+            <div class="forecast-hotspots-topline">
+              <p class="forecast-hotspots-label">Regional hotspots</p>
+              <p id="forecast-hotspots-summary" class="forecast-hotspots-summary">Watching clustering</p>
+            </div>
+            <ul id="forecast-hotspots-list" class="forecast-hotspots-list">
+              <li class="forecast-hotspot-item">
+                <span class="forecast-hotspot-rank">1</span>
+                <span class="forecast-hotspot-name">Waiting for live clusters</span>
+                <span class="forecast-hotspot-count">--</span>
+              </li>
+            </ul>
+          </div>
+        </article>
+      </section>
+    </details>
 
     <!-- Quick status note for students testing the project -->
     <section class="status-panel">
@@ -83,18 +156,18 @@
     <section class="trends-panel" aria-label="Earthquake trends">
       <div class="section-heading">
         <div>
-          <p class="section-eyebrow">Quick trends</p>
-          <h2 class="section-title">Current feed pulse</h2>
+          <p class="section-eyebrow">Forecasting</p>
+          <h2 class="section-title">Predictive analytics outlook</h2>
         </div>
         <p class="section-copy">
-          Fast stats for the current filtered view so it is easier to spot fresh activity and stronger clusters.
+          Experimental short-term forecasting based on recent event frequency, magnitude, and acceleration patterns. It highlights risk signals instead of predicting the exact time or location of earthquakes.
         </p>
       </div>
       <div id="trends-grid" class="trends-grid">
         <article class="trend-card">
-          <p class="trend-label">Past hour</p>
-          <p class="trend-value">0</p>
-          <p class="trend-meta">Waiting for live data...</p>
+          <p class="trend-label">6-hour outlook</p>
+          <p class="trend-value">Waiting</p>
+          <p class="trend-meta">Loading enough recent events to build the first forecast signal...</p>
         </article>
       </div>
     </section>

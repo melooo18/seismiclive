@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import {
-  buildTrendSummary,
+  buildPredictiveInsights,
   formatBooleanLabel,
   formatLocalTime,
   formatNumber,
@@ -37,6 +37,16 @@ const searchInput = document.getElementById("search-input");
 const filterButtons = Array.from(document.querySelectorAll(".filter-chip"));
 const regionButtons = Array.from(document.querySelectorAll(".region-chip"));
 const heroHighlight = document.getElementById("hero-highlight");
+const forecastHeadline = document.getElementById("forecast-headline");
+const forecastChip = document.getElementById("forecast-chip");
+const forecastCopy = document.getElementById("forecast-copy");
+const forecastRationale = document.getElementById("forecast-rationale");
+const forecastHeroCard = document.querySelector(".forecast-hero-card");
+const forecastChart = document.getElementById("forecast-chart");
+const forecastChartPeak = document.getElementById("forecast-chart-peak");
+const forecastChartFootnote = document.getElementById("forecast-chart-footnote");
+const forecastHotspotsSummary = document.getElementById("forecast-hotspots-summary");
+const forecastHotspotsList = document.getElementById("forecast-hotspots-list");
 const metricTotal = document.getElementById("metric-total");
 const metricAverage = document.getElementById("metric-average");
 const metricSevere = document.getElementById("metric-severe");
@@ -640,37 +650,42 @@ function renderTrends(quakes) {
 
   trendsGrid.innerHTML = "";
 
-  const summary = buildTrendSummary(quakes);
+  const insight = buildPredictiveInsights(quakes);
   const cards = [
     {
-      label: "Past hour",
-      value: String(summary.lastHourCount),
-      meta: "Events detected in the last 60 minutes"
+      label: "6-hour outlook",
+      value: insight.outlook,
+      meta: quakes.length
+        ? `Experimental signal based on ${insight.lastSixHourCount} recent event${insight.lastSixHourCount === 1 ? "" : "s"}`
+        : "Waiting for enough earthquake activity to model a trend",
+      tone: insight.outlook
     },
     {
-      label: "Past 24 hours",
-      value: String(summary.lastDayCount),
-      meta: "Visible events during the last day"
+      label: "Risk score",
+      value: `${insight.riskScore}/99`,
+      meta: `Weights fresh counts, magnitude, and M 5+ activity in the current view`,
+      tone: insight.riskScore >= 75 ? "Escalating" : insight.riskScore >= 55 ? "Elevated" : "Steady"
     },
     {
-      label: "Strongest 24h",
-      value: summary.strongestDayQuake
-        ? `M ${summary.strongestDayQuake.magnitude.toFixed(1)}`
-        : "None",
-      meta: summary.strongestDayQuake
-        ? truncateLocation(summary.strongestDayQuake.location, 36)
-        : "No recent event in this view"
+      label: "Hourly acceleration",
+      value: insight.hourlyAccelerationLabel,
+      meta: `${insight.lastHourCount} event${insight.lastHourCount === 1 ? "" : "s"} in the last hour compared with the previous hour`,
+      tone: insight.hourlyAccelerationLabel.startsWith("+") ? "Elevated" : "Steady"
     },
     {
-      label: "Average magnitude",
-      value: summary.averageMagnitude.toFixed(1),
-      meta: `Sorted by ${appState.sortOrder}`
+      label: "Model confidence",
+      value: insight.confidence,
+      meta: insight.hotspotCount
+        ? `Most active recent zone: ${truncateLocation(insight.hotspotLabel, 26)} (${insight.hotspotCount})`
+        : "Confidence increases as more recent events enter the feed",
+      tone: insight.confidence
     }
   ];
 
   cards.forEach((cardData) => {
     const card = document.createElement("article");
     card.className = "trend-card";
+    card.dataset.tone = (cardData.tone || "steady").toLowerCase();
 
     const label = document.createElement("p");
     label.className = "trend-label";
@@ -687,6 +702,255 @@ function renderTrends(quakes) {
     card.append(label, value, meta);
     trendsGrid.appendChild(card);
   });
+}
+
+function buildHourlyBuckets(quakes, now = Date.now()) {
+  const bucketCount = 24;
+  const bucketSizeMs = 60 * 60 * 1000;
+  const buckets = Array.from({ length: bucketCount }, (_, index) => ({
+    hourOffset: bucketCount - index - 1,
+    count: 0,
+    magnitudeSum: 0
+  }));
+
+  quakes.forEach((quake) => {
+    const timeMs = quake.time?.toDate ? quake.time.toDate().getTime() : 0;
+    const ageMs = now - timeMs;
+
+    if (ageMs < 0 || ageMs > bucketCount * bucketSizeMs) {
+      return;
+    }
+
+    const bucketIndex = bucketCount - 1 - Math.floor(ageMs / bucketSizeMs);
+
+    if (buckets[bucketIndex]) {
+      buckets[bucketIndex].count += 1;
+      buckets[bucketIndex].magnitudeSum += quake.magnitude || 0;
+    }
+  });
+
+  buckets.forEach((bucket) => {
+    bucket.averageMagnitude = bucket.count > 0 ? bucket.magnitudeSum / bucket.count : 0;
+  });
+
+  return buckets;
+}
+
+function buildPolylinePoints(values, width, height, padding) {
+  const maxValue = Math.max(...values, 1);
+  const usableWidth = width - padding * 2;
+  const usableHeight = height - padding * 2;
+
+  return values.map((value, index) => {
+    const x = padding + (usableWidth * index) / Math.max(values.length - 1, 1);
+    const y = height - padding - (value / maxValue) * usableHeight;
+    return [x, y];
+  });
+}
+
+function renderForecastChart(quakes) {
+  if (!forecastChart || !forecastChartPeak || !forecastChartFootnote) {
+    return;
+  }
+
+  const width = 320;
+  const height = 120;
+  const padding = 12;
+  const buckets = buildHourlyBuckets(quakes);
+  const values = buckets.map((bucket) => bucket.count);
+  const magnitudeValues = buckets.map((bucket) => bucket.averageMagnitude);
+  const points = buildPolylinePoints(values, width, height, padding);
+  const magnitudePoints = buildPolylinePoints(magnitudeValues, width, height, padding);
+  const peakValue = Math.max(...values, 0);
+  const latestValue = values[values.length - 1] || 0;
+  const latestMagnitudeValue = magnitudeValues[magnitudeValues.length - 1] || 0;
+  const peakHourIndex = values.indexOf(peakValue);
+  const averageValue =
+    values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+  const surgeThreshold = Math.max(2, Math.ceil(averageValue * 1.8));
+  const surgeMarkers = points
+    .map(([x, y], index) => ({ x, y, value: values[index], index }))
+    .filter((point) => point.value >= surgeThreshold)
+    .slice(-3);
+  const formatHoursAgoLabel = (index) => {
+    const hoursAgo = values.length - 1 - index;
+
+    if (hoursAgo <= 0) {
+      return "now";
+    }
+
+    if (hoursAgo === 1) {
+      return "1h ago";
+    }
+
+    return `${hoursAgo}h ago`;
+  };
+  const peakLabel =
+    peakValue > 0 && peakHourIndex >= 0
+      ? `${peakValue} event${peakValue === 1 ? "" : "s"} at ${formatHoursAgoLabel(peakHourIndex)}`
+      : "No spike yet";
+
+  const gridLines = [0.25, 0.5, 0.75].map((ratio) => {
+    const y = Math.round(height - padding - (height - padding * 2) * ratio);
+    return `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" />`;
+  }).join("");
+
+  const linePoints = points.map(([x, y]) => `${x},${y}`).join(" ");
+  const magnitudeLinePoints = magnitudePoints.map(([x, y]) => `${x},${y}`).join(" ");
+  const areaPoints = [
+    `${points[0][0]},${height - padding}`,
+    ...points.map(([x, y]) => `${x},${y}`),
+    `${points[points.length - 1][0]},${height - padding}`
+  ].join(" ");
+
+  const finalPoint = points[points.length - 1];
+  const surgeMarkerMarkup = surgeMarkers.map((point) => `
+    <g>
+      <circle
+        cx="${point.x}"
+        cy="${point.y}"
+        r="5.5"
+        fill="rgb(248, 113, 113)"
+        fill-opacity="0.92"
+        stroke="rgba(30, 41, 59, 0.95)"
+        stroke-width="2"
+      ></circle>
+      <text
+        x="${point.x}"
+        y="${Math.max(point.y - 10, 14)}"
+        text-anchor="middle"
+        fill="rgba(248, 250, 252, 0.92)"
+        font-size="9"
+        font-family="Inter, system-ui, sans-serif"
+      >${point.value}</text>
+    </g>
+  `).join("");
+
+  forecastChart.innerHTML = `
+    <defs>
+      <linearGradient id="forecast-area-gradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgb(96, 165, 250)" stop-opacity="0.42" />
+        <stop offset="100%" stop-color="rgb(96, 165, 250)" stop-opacity="0.02" />
+      </linearGradient>
+    </defs>
+    <g class="forecast-chart-grid" stroke="rgba(148, 163, 184, 0.18)" stroke-width="1">
+      ${gridLines}
+    </g>
+    <polygon points="${areaPoints}" fill="url(#forecast-area-gradient)"></polygon>
+    <polyline
+      points="${linePoints}"
+      fill="none"
+      stroke="rgba(96, 165, 250, 0.95)"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    ></polyline>
+    <polyline
+      points="${magnitudeLinePoints}"
+      fill="none"
+      stroke="rgba(251, 191, 36, 0.95)"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-dasharray="5 4"
+    ></polyline>
+    ${surgeMarkerMarkup}
+    <circle
+      cx="${finalPoint[0]}"
+      cy="${finalPoint[1]}"
+      r="4.5"
+      fill="rgba(191, 219, 254, 1)"
+      stroke="rgba(30, 41, 59, 0.9)"
+      stroke-width="2"
+    ></circle>
+  `;
+
+  forecastChartPeak.textContent = `Peak: ${peakLabel}`;
+  forecastChartFootnote.textContent =
+    surgeMarkers.length > 0
+      ? `${surgeMarkers.length} surge hour${surgeMarkers.length === 1 ? "" : "s"} highlighted where activity moved above the recent baseline.`
+      : latestMagnitudeValue > 0
+        ? `Latest hour averaged M ${latestMagnitudeValue.toFixed(1)} across ${latestValue} visible event${latestValue === 1 ? "" : "s"}.`
+      : latestValue > 0
+        ? `${latestValue} event${latestValue === 1 ? "" : "s"} detected in the latest hour of the visible feed.`
+        : "No events were logged in the latest hour of the visible feed.";
+}
+
+function renderForecastHotspots(insight) {
+  if (!forecastHotspotsSummary || !forecastHotspotsList) {
+    return;
+  }
+
+  forecastHotspotsSummary.textContent = insight.topHotspots.length
+    ? `${insight.topHotspots.length} active zone${insight.topHotspots.length === 1 ? "" : "s"}`
+    : "Watching clustering";
+
+  forecastHotspotsList.innerHTML = "";
+
+  if (!insight.topHotspots.length) {
+    const item = document.createElement("li");
+    item.className = "forecast-hotspot-item";
+    item.innerHTML = `
+      <span class="forecast-hotspot-rank">1</span>
+      <span class="forecast-hotspot-name">Waiting for live clusters</span>
+      <span class="forecast-hotspot-count">--</span>
+    `;
+    forecastHotspotsList.appendChild(item);
+    return;
+  }
+
+  insight.topHotspots.forEach((hotspot, index) => {
+    const item = document.createElement("li");
+    item.className = "forecast-hotspot-item";
+
+    const rank = document.createElement("span");
+    rank.className = "forecast-hotspot-rank";
+    rank.textContent = String(index + 1);
+
+    const name = document.createElement("span");
+    name.className = "forecast-hotspot-name";
+    name.textContent = truncateLocation(hotspot.label, 24);
+    name.title = hotspot.label;
+
+    const count = document.createElement("span");
+    count.className = "forecast-hotspot-count";
+    count.textContent = `${hotspot.count} event${hotspot.count === 1 ? "" : "s"}`;
+
+    item.append(rank, name, count);
+    forecastHotspotsList.appendChild(item);
+  });
+}
+
+function renderForecastRail(quakes) {
+  if (
+    !forecastHeadline ||
+    !forecastChip ||
+    !forecastCopy ||
+    !forecastRationale ||
+    !forecastHeroCard
+  ) {
+    return;
+  }
+
+  const insight = buildPredictiveInsights(quakes);
+  forecastHeroCard.dataset.tone = insight.outlook.toLowerCase();
+  forecastHeadline.textContent = `6-hour outlook: ${insight.outlook}`;
+  forecastChip.textContent = `${insight.confidence} confidence`;
+  renderForecastChart(quakes);
+  renderForecastHotspots(insight);
+
+  if (!quakes.length) {
+    forecastCopy.textContent =
+      "Waiting for enough recent activity to build the first short-term forecast.";
+    forecastRationale.textContent =
+      "The outlook updates as new events enter the live feed.";
+    return;
+  }
+
+  forecastCopy.textContent =
+    `${insight.trendDirection} trend. Risk score ${insight.riskScore}/99 with ${insight.lastHourCount} event${insight.lastHourCount === 1 ? "" : "s"} in the last hour.`;
+  forecastRationale.textContent =
+    `Signals are strongest around ${truncateLocation(insight.hotspotLabel, 24)} based on recent acceleration and magnitude changes.`;
 }
 
 function updateSearchClearButton() {
@@ -1184,6 +1448,7 @@ function renderDashboard() {
 
   renderOverview(visibleQuakes);
   renderHeroHighlight(visibleQuakes);
+  renderForecastRail(visibleQuakes);
   renderTicker(visibleQuakes);
   renderLiveStatus(visibleQuakes);
   renderTrends(visibleQuakes);

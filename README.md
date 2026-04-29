@@ -1,6 +1,6 @@
 # SeismicLive
 
-SeismicLive is a browser dashboard for monitoring recent earthquakes from the USGS live feed with a Firestore-backed cache, Philippine-area focus controls, an interactive map, and realtime updates.
+SeismicLive is a browser dashboard for monitoring recent earthquakes from the USGS live feed with a Firestore-backed cache, Philippine-area focus controls, an interactive map, realtime updates, and an experimental predictive analytics layer.
 
 ## What It Does
 
@@ -10,14 +10,25 @@ SeismicLive is a browser dashboard for monitoring recent earthquakes from the US
 - Shows an interactive Leaflet map with clustered markers and modal drilldowns.
 - Supports sorting by newest, strongest, shallowest, or closest regional match.
 - Surfaces feed freshness, offline fallback states, and Firestore listener issues.
-- Includes quick trend cards for the current filtered view.
+- Includes an experimental predictive analytics outlook that scores recent activity and estimates short-term trend direction.
+
+## Emerging Tech Layer
+
+This project now goes beyond simply displaying USGS data. SeismicLive adds its own predictive analytics module that analyzes recent earthquake frequency, magnitude, and acceleration patterns to generate:
+
+- a 6-hour activity outlook
+- a live risk score
+- an hourly acceleration signal
+- a confidence rating based on recent event volume
+
+This is presented as an experimental decision-support feature, not an exact earthquake prediction engine. That distinction matters: the app is applying analytics to live data to produce a new forecast signal, which is the emerging-tech component of the project.
 
 ## Project Files
 
 - `index.html`: Dashboard markup and UI structure.
 - `style.css`: Theme, layout, responsive, and component styling.
-- `app.js`: Dashboard orchestration, Firestore sync, UI rendering, and map behavior.
-- `utils.js`: Small testable formatting, filtering, sorting, and trend helpers.
+- `app.js`: Dashboard orchestration, Firestore sync, UI rendering, map behavior, and predictive insight cards.
+- `utils.js`: Small testable formatting, filtering, sorting, trend helpers, and predictive analytics calculations.
 - `firebase-config.js`: Firebase app and Firestore connection settings.
 - `firestore.rules`: Recommended baseline production rules for a non-public write path.
 
