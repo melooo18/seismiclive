@@ -753,6 +753,7 @@ function renderForecastChart(quakes) {
     return;
   }
 
+  const isLightTheme = document.body.dataset.theme === "light";
   const width = 320;
   const height = 120;
   const padding = 12;
@@ -804,24 +805,40 @@ function renderForecastChart(quakes) {
   ].join(" ");
 
   const finalPoint = points[points.length - 1];
+  const markerStroke = isLightTheme ? "rgba(88, 47, 12, 0.88)" : "rgba(30, 41, 59, 0.95)";
+  const markerTextFill = isLightTheme ? "rgba(47, 25, 0, 0.96)" : "rgba(248, 250, 252, 0.92)";
+  const gridStroke = isLightTheme ? "rgba(140, 98, 35, 0.18)" : "rgba(148, 163, 184, 0.18)";
+  const areaBottomOpacity = isLightTheme ? "0.08" : "0.02";
+  const finalPointStroke = isLightTheme ? "rgba(88, 47, 12, 0.82)" : "rgba(30, 41, 59, 0.9)";
+  const surgeRingFill = isLightTheme ? "rgba(255, 244, 232, 0.95)" : "rgba(15, 23, 42, 0.7)";
   const surgeMarkerMarkup = surgeMarkers.map((point) => `
     <g>
       <circle
         cx="${point.x}"
         cy="${point.y}"
-        r="5.5"
+        r="8.5"
+        fill="${surgeRingFill}"
+        stroke="${markerStroke}"
+        stroke-width="1.5"
+      ></circle>
+      <circle
+        cx="${point.x}"
+        cy="${point.y}"
+        r="5.8"
         fill="rgb(248, 113, 113)"
         fill-opacity="0.92"
-        stroke="rgba(30, 41, 59, 0.95)"
-        stroke-width="2"
+        stroke="${markerStroke}"
+        stroke-width="1.5"
       ></circle>
       <text
         x="${point.x}"
-        y="${Math.max(point.y - 10, 14)}"
+        y="${point.y + 0.5}"
         text-anchor="middle"
-        fill="rgba(248, 250, 252, 0.92)"
-        font-size="9"
+        dominant-baseline="middle"
+        fill="${markerTextFill}"
+        font-size="8.5"
         font-family="Inter, system-ui, sans-serif"
+        font-weight="700"
       >${point.value}</text>
     </g>
   `).join("");
@@ -830,10 +847,10 @@ function renderForecastChart(quakes) {
     <defs>
       <linearGradient id="forecast-area-gradient" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="rgb(96, 165, 250)" stop-opacity="0.42" />
-        <stop offset="100%" stop-color="rgb(96, 165, 250)" stop-opacity="0.02" />
+        <stop offset="100%" stop-color="rgb(96, 165, 250)" stop-opacity="${areaBottomOpacity}" />
       </linearGradient>
     </defs>
-    <g class="forecast-chart-grid" stroke="rgba(148, 163, 184, 0.18)" stroke-width="1">
+    <g class="forecast-chart-grid" stroke="${gridStroke}" stroke-width="1">
       ${gridLines}
     </g>
     <polygon points="${areaPoints}" fill="url(#forecast-area-gradient)"></polygon>
@@ -860,7 +877,7 @@ function renderForecastChart(quakes) {
       cy="${finalPoint[1]}"
       r="4.5"
       fill="rgba(191, 219, 254, 1)"
-      stroke="rgba(30, 41, 59, 0.9)"
+      stroke="${finalPointStroke}"
       stroke-width="2"
     ></circle>
   `;

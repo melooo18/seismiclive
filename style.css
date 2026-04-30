@@ -229,17 +229,18 @@ body[data-theme="light"] .forecast-summary-bar {
 }
 
 body[data-theme="light"] .forecast-summary-toggle {
-  color: #8d5e1f;
+  color: #6f4515;
+  font-weight: 700;
 }
 
 body[data-theme="light"] .forecast-chip,
 body[data-theme="light"] .forecast-direction-badge {
-  border-color: rgba(196, 142, 55, 0.18);
-  background: rgba(255, 250, 240, 0.92);
+  border-color: rgba(179, 116, 32, 0.26);
+  background: rgba(255, 252, 245, 0.98);
 }
 
 body[data-theme="light"] .forecast-direction-badge {
-  color: var(--muted-strong);
+  color: #74471a;
 }
 
 body[data-theme="light"] .forecast-direction-badge[data-trend="worsening"] {
@@ -262,9 +263,9 @@ body[data-theme="light"] .forecast-direction-badge[data-trend="stable"] {
 
 body[data-theme="light"] .forecast-chart-card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(252, 243, 224, 0.94)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 246, 231, 0.98)),
     var(--panel-strong);
-  border-color: rgba(180, 130, 60, 0.18);
+  border-color: rgba(204, 130, 37, 0.26);
 }
 
 body[data-theme="light"] .forecast-chart-footnote,
@@ -274,13 +275,13 @@ body[data-theme="light"] .forecast-legend-item,
 body[data-theme="light"] .forecast-side-copy,
 body[data-theme="light"] .forecast-copy,
 body[data-theme="light"] .forecast-hotspots-label {
-  color: var(--muted-strong);
+  color: #744d20;
 }
 
 body[data-theme="light"] .forecast-hotspot-item {
-  border-color: rgba(180, 130, 60, 0.16);
+  border-color: rgba(196, 128, 39, 0.2);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 246, 227, 0.85)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 248, 234, 0.96)),
     var(--panel);
 }
 
@@ -290,9 +291,26 @@ body[data-theme="light"] .forecast-hotspot-rank {
 }
 
 body[data-theme="light"] .forecast-hotspot-count {
-  border-color: rgba(180, 130, 60, 0.16);
-  background: rgba(255, 249, 236, 0.95);
-  color: var(--muted-strong);
+  border-color: rgba(196, 128, 39, 0.22);
+  background: rgba(255, 251, 241, 0.98);
+  color: #7d5122;
+}
+
+body[data-theme="light"] .forecast-headline,
+body[data-theme="light"] .forecast-chart-peak,
+body[data-theme="light"] .forecast-hotspots-summary,
+body[data-theme="light"] .forecast-hotspot-name {
+  color: #2f1900;
+}
+
+body[data-theme="light"] .forecast-chip,
+body[data-theme="light"] .forecast-shell[open] .forecast-summary-toggle {
+  color: #60370f;
+}
+
+body[data-theme="light"] .forecast-rail,
+body[data-theme="light"] .forecast-side-card {
+  border-color: rgba(196, 128, 39, 0.16);
 }
 
 .hero-tagline {
