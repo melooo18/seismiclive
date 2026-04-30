@@ -56,7 +56,6 @@ const mapSection = document.getElementById("map-section");
 const notificationThresholdSelect = document.getElementById("notification-threshold-select");
 const sortSelect = document.getElementById("sort-select");
 const trendsGrid = document.getElementById("trends-grid");
-const databaseStatusCopy = document.getElementById("database-status-copy");
 
 const appState = {
   syncMessage: "Waiting for the USGS live feed...",
@@ -169,26 +168,7 @@ function syncActiveQuakes() {
     : appState.cachedQuakes;
 }
 
-function updateDatabaseStatusCopy() {
-  if (!databaseStatusCopy) {
-    return;
-  }
 
-  if (appState.firestoreError) {
-    databaseStatusCopy.textContent =
-      "Firestore fallback is unavailable right now, so SeismicLive is relying only on the live USGS browser feed.";
-    return;
-  }
-
-  if (appState.cachedQuakes.length) {
-    databaseStatusCopy.textContent =
-      "Firestore is connected in read-only mode and can act as fallback data if the live USGS fetch fails.";
-    return;
-  }
-
-  databaseStatusCopy.textContent =
-    "Firestore fallback is optional on Spark. This dashboard fetches live USGS data in the browser and reads cached quakes only when available.";
-}
 
 function isPhilippinesArea(quake) {
   const latitude = typeof quake.latitude === "number" ? quake.latitude : null;
@@ -1028,7 +1008,6 @@ function updateSettingsControls() {
     sortSelect.value = appState.sortOrder;
   }
 
-  updateDatabaseStatusCopy();
 }
 
 function updateOverviewButtons() {
@@ -1640,7 +1619,6 @@ function listenForQuakes() {
       }
 
       appState.hasHydrated = true;
-      updateDatabaseStatusCopy();
 
       if (!appState.quakes.some((quake) => quake.id === appState.selectedQuakeId)) {
         closeDetailModal();
@@ -1655,7 +1633,6 @@ function listenForQuakes() {
       appState.firestoreError = "Live Firestore listener failed.";
       appState.isBootstrapping = false;
       console.error("Error listening for live Firestore updates:", error);
-      updateDatabaseStatusCopy();
       renderDashboard();
     }
   );
@@ -1848,7 +1825,6 @@ async function init() {
   updateSyncButton();
   updateRegionButtons();
   updateSettingsControls();
-  updateDatabaseStatusCopy();
   renderDashboard();
   setupRegionControls();
   setupFilterControls();
