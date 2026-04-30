@@ -809,7 +809,11 @@ function renderForecastChart(quakes) {
 
   const gridLines = [0.25, 0.5, 0.75].map((ratio) => {
     const y = Math.round(height - padding - (height - padding * 2) * ratio);
-    return `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" />`;
+    const val = Math.round(ratio * Math.max(...values, 1));
+    return `
+      <line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke-dasharray="3 3" />
+      <text x="${padding}" y="${y - 4}" fill="${isLightTheme ? 'rgba(160, 110, 50, 0.7)' : 'rgba(148, 163, 184, 0.7)'}" stroke="none" font-size="8" font-weight="500" font-family="Inter, system-ui, sans-serif">${val}</text>
+    `;
   }).join("");
 
   const linePoints = points.map(([x, y]) => `${x},${y}`).join(" ");

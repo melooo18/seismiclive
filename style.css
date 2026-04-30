@@ -459,14 +459,21 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   min-height: 32px;
-  padding: 0.35rem 0.2rem;
-  border: 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--panel-border-strong);
   border-radius: 999px;
-  background: transparent;
-  color: var(--accent);
+  background: var(--panel-tint);
+  color: var(--text);
   font-size: 0.82rem;
+  font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.forecast-summary-toggle:hover {
+  background: var(--panel-tint-strong);
+  border-color: var(--accent);
 }
 
 .forecast-shell[open] .forecast-summary-toggle {
@@ -673,7 +680,12 @@ h1, h2, h3, h4, h5, h6 {
 .forecast-chart-axis {
   margin-top: 0.45rem;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3.75%;
 }
 
 .forecast-chart-footnote {
