@@ -1,4 +1,4 @@
-import { db } from "./firebase-config.js";
+import { subscribeToQuakes } from "./quake-feed-service.js";
 import {
   buildPredictiveInsights,
   formatBooleanLabel,
@@ -11,20 +11,6 @@ import {
   sortQuakes,
   truncateLocation
 } from "./utils.js";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  setDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  limit,
-  Timestamp,
-  where
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
 const USGS_URL =
   "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -55,13 +41,8 @@ const overviewButtons = Array.from(document.querySelectorAll("[data-metric-actio
 const tickerContent = document.getElementById("ticker-content");
 const liveStatusCopy = document.getElementById("live-status-copy");
 const liveStatusTag = document.getElementById("live-status-tag");
-const cleanupButtons = Array.from(document.querySelectorAll("[data-cleanup]"));
 const defaultRegionSelect = document.getElementById("default-region-select");
 const autoSyncToggle = document.getElementById("auto-sync-toggle");
-const retentionDaysSelect = document.getElementById("retention-days-select");
-const maxDocsSelect = document.getElementById("max-docs-select");
-const minMagSelect = document.getElementById("min-mag-select");
-const storageScopeSelect = document.getElementById("storage-scope-select");
 const resetFiltersButton = document.getElementById("reset-filters-button");
 const detailModal = document.getElementById("detail-modal");
 const detailBackdrop = document.getElementById("detail-backdrop");
@@ -75,27 +56,25 @@ const mapSection = document.getElementById("map-section");
 const notificationThresholdSelect = document.getElementById("notification-threshold-select");
 const sortSelect = document.getElementById("sort-select");
 const trendsGrid = document.getElementById("trends-grid");
-
-const quakesCollection = collection(db, "quakes");
+const databaseStatusCopy = document.getElementById("database-status-copy");
 
 const appState = {
-  syncMessage: "Waiting for Firestore updates...",
+  syncMessage: "Waiting for the USGS live feed...",
   selectedFilter: "all",
   selectedRegion: "global",
   searchTerm: "",
   sortOrder: "newest",
   theme: "dark",
   quakes: [],
+  liveQuakes: [],
+  cachedQuakes: [],
   isSyncing: false,
   isBootstrapping: true,
   dataUpdatedAt: null,
   lastSuccessfulFetchAt: null,
   selectedQuakeId: null,
   autoSyncEnabled: true,
-  retentionDays: 30,
   maxStoredDocs: 500,
-  minStoredMagnitude: 2.5,
-  storageScope: "global",
   recentlyAddedIds: new Set(),
   knownQuakeIds: new Set(),
   hasHydrated: false,
@@ -110,6 +89,7 @@ let map = null;
 let markerCluster = null;
 const markerById = new Map();
 let pendingLinkedQuakeId = null;
+let quakesUnsubscribe = null;
 
 function getMagColor(mag) {
   if (mag >= 7) {
@@ -127,12 +107,87 @@ function getMagColor(mag) {
   return "#27ae60";
 }
 
-function toFirestoreTimestamp(rawTime) {
-  if (typeof rawTime === "number" && Number.isFinite(rawTime)) {
-    return Timestamp.fromMillis(rawTime);
+function buildPopupContent(quake) {
+  const wrapper = document.createElement("div");
+
+  const title = document.createElement("strong");
+  title.textContent = quake.location;
+
+  const magnitude = document.createElement("div");
+  magnitude.textContent = `M ${quake.magnitude.toFixed(1)}`;
+
+  const time = document.createElement("div");
+  time.textContent = formatLocalTime(quake.time);
+
+  const hint = document.createElement("span");
+  hint.className = "map-popup-hint";
+  hint.textContent = "Open full event details";
+
+  wrapper.append(title, document.createElement("br"), magnitude, time, hint);
+  return wrapper;
+}
+
+function toAppTimestamp(rawTime) {
+  const millis = typeof rawTime === "number" && Number.isFinite(rawTime)
+    ? rawTime
+    : Date.now();
+
+  return {
+    toDate() {
+      return new Date(millis);
+    },
+    toMillis() {
+      return millis;
+    }
+  };
+}
+
+function normalizeFeedFeature(feature) {
+  const properties = feature.properties ?? {};
+  const coordinates = feature.geometry?.coordinates ?? [];
+
+  return {
+    id: feature.id,
+    magnitude: typeof properties.mag === "number" ? properties.mag : 0,
+    location: properties.place ?? "Unknown location",
+    time: toAppTimestamp(properties.time),
+    usgsId: feature.id,
+    latitude: typeof coordinates[1] === "number" ? coordinates[1] : null,
+    longitude: typeof coordinates[0] === "number" ? coordinates[0] : null,
+    depth: typeof coordinates[2] === "number" ? coordinates[2] : null,
+    title: properties.title ?? "",
+    url: properties.url ?? "",
+    status: properties.status ?? "",
+    alert: properties.alert ?? "",
+    tsunami: typeof properties.tsunami === "number" ? properties.tsunami : 0
+  };
+}
+
+function syncActiveQuakes() {
+  appState.quakes = appState.liveQuakes.length
+    ? appState.liveQuakes
+    : appState.cachedQuakes;
+}
+
+function updateDatabaseStatusCopy() {
+  if (!databaseStatusCopy) {
+    return;
   }
 
-  return Timestamp.now();
+  if (appState.firestoreError) {
+    databaseStatusCopy.textContent =
+      "Firestore fallback is unavailable right now, so SeismicLive is relying only on the live USGS browser feed.";
+    return;
+  }
+
+  if (appState.cachedQuakes.length) {
+    databaseStatusCopy.textContent =
+      "Firestore is connected in read-only mode and can act as fallback data if the live USGS fetch fails.";
+    return;
+  }
+
+  databaseStatusCopy.textContent =
+    "Firestore fallback is optional on Spark. This dashboard fetches live USGS data in the browser and reads cached quakes only when available.";
 }
 
 function isPhilippinesArea(quake) {
@@ -239,10 +294,6 @@ function saveSettings() {
   const settings = {
     defaultRegion: appState.selectedRegion,
     autoSyncEnabled: appState.autoSyncEnabled,
-    retentionDays: appState.retentionDays,
-    maxStoredDocs: appState.maxStoredDocs,
-    minStoredMagnitude: appState.minStoredMagnitude,
-    storageScope: appState.storageScope,
     theme: appState.theme,
     notificationThreshold: appState.notificationThreshold,
     sortOrder: appState.sortOrder
@@ -264,17 +315,6 @@ function loadSettings() {
     appState.selectedRegion =
       parsed.defaultRegion === "philippines" ? "philippines" : "global";
     appState.autoSyncEnabled = parsed.autoSyncEnabled !== false;
-    appState.retentionDays = [7, 14, 30, 90].includes(parsed.retentionDays)
-      ? parsed.retentionDays
-      : 30;
-    appState.maxStoredDocs = [100, 250, 500, 1000].includes(parsed.maxStoredDocs)
-      ? parsed.maxStoredDocs
-      : 500;
-    appState.minStoredMagnitude = [0, 1.5, 2.5, 4].includes(parsed.minStoredMagnitude)
-      ? parsed.minStoredMagnitude
-      : 2.5;
-    appState.storageScope =
-      parsed.storageScope === "philippines" ? "philippines" : "global";
     appState.theme = parsed.theme === "light" ? "light" : "dark";
     appState.notificationThreshold =
       typeof parsed.notificationThreshold === "number" ? parsed.notificationThreshold : 5;
@@ -513,11 +553,7 @@ function updateMapMarkers(quakes) {
       weight: 1
     });
 
-    marker.bindPopup(
-      `<strong>${quake.location}</strong><br/>M ${quake.magnitude.toFixed(1)}<br/>${formatLocalTime(
-        quake.time
-      )}<br/><span class="map-popup-hint">Open full event details</span>`
-    );
+    marker.bindPopup(buildPopupContent(quake));
     marker.options.title = `${quake.location} - M ${quake.magnitude.toFixed(1)}`;
     marker.on("click", () => {
       openDetailModal(quake.id);
@@ -606,13 +642,13 @@ function getFirestoreStatusLine() {
   if (!appState.hasHydrated) {
     return {
       tone: "neutral",
-      text: "Waiting for Firestore data..."
+      text: "Waiting for Firestore fallback data..."
     };
   }
 
   return {
     tone: "success",
-    text: "Realtime Firestore feed connected."
+    text: "Read-only Firestore fallback connected."
   };
 }
 
@@ -983,10 +1019,6 @@ function updateRegionButtons() {
 function updateSettingsControls() {
   defaultRegionSelect.value = appState.selectedRegion;
   autoSyncToggle.checked = appState.autoSyncEnabled;
-  retentionDaysSelect.value = String(appState.retentionDays);
-  maxDocsSelect.value = String(appState.maxStoredDocs);
-  minMagSelect.value = String(appState.minStoredMagnitude);
-  storageScopeSelect.value = appState.storageScope;
 
   if (notificationThresholdSelect) {
     notificationThresholdSelect.value = String(appState.notificationThreshold || 0);
@@ -995,6 +1027,8 @@ function updateSettingsControls() {
   if (sortSelect) {
     sortSelect.value = appState.sortOrder;
   }
+
+  updateDatabaseStatusCopy();
 }
 
 function updateOverviewButtons() {
@@ -1370,7 +1404,7 @@ function renderLiveStatus(quakes) {
   ];
 
   if (appState.fetchError) {
-    statusCopyParts.push("USGS fetch issues detected, so the dashboard is leaning on saved Firestore data.");
+    statusCopyParts.push("USGS fetch issues detected, so the dashboard is leaning on saved Firestore data when available.");
   }
 
   if (appState.firestoreError) {
@@ -1439,7 +1473,7 @@ function renderEmptyState() {
 
   if (appState.isBootstrapping) {
     title.textContent = "Loading recent earthquake activity...";
-    copy.textContent = "SeismicLive is connecting to Firestore and checking the latest USGS feed.";
+    copy.textContent = "SeismicLive is checking the latest USGS feed and any cached Firestore fallback data.";
   } else if (appState.isOffline && !appState.quakes.length) {
     title.textContent = "You are offline and no saved quakes are available yet.";
     copy.textContent = "Reconnect to the internet and refresh the feed to populate the dashboard.";
@@ -1536,54 +1570,10 @@ function applyOverviewAction(action) {
   renderDashboard();
 }
 
-function shouldStoreQuake(quake) {
-  const magnitude = typeof quake.magnitude === "number" ? quake.magnitude : 0;
-
-  if (magnitude < appState.minStoredMagnitude) {
-    return false;
-  }
-
-  if (appState.storageScope === "philippines") {
-    return isPhilippinesArea(quake);
-  }
-
-  return true;
-}
-
-async function enforceStorageLimits() {
-  let deletedCount = 0;
-
-  const cutoffDate = new Date(Date.now() - appState.retentionDays * 24 * 60 * 60 * 1000);
-  const oldDocsSnapshot = await getDocs(
-    query(quakesCollection, where("time", "<", Timestamp.fromDate(cutoffDate)))
-  );
-
-  if (!oldDocsSnapshot.empty) {
-    await Promise.all(
-      oldDocsSnapshot.docs.map((quakeDoc) => deleteDoc(doc(db, "quakes", quakeDoc.id)))
-    );
-    deletedCount += oldDocsSnapshot.size;
-  }
-
-  const orderedDocsSnapshot = await getDocs(query(quakesCollection, orderBy("time", "desc")));
-  const extraDocs = orderedDocsSnapshot.docs.slice(appState.maxStoredDocs);
-
-  if (extraDocs.length) {
-    await Promise.all(
-      extraDocs.map((quakeDoc) => deleteDoc(doc(db, "quakes", quakeDoc.id)))
-    );
-    deletedCount += extraDocs.length;
-  }
-
-  if (deletedCount > 0) {
-    setSettingsStatus(
-      `Automatic cleanup removed ${deletedCount} quake records to protect Firestore limits.`
-    );
-  }
-}
-
 async function fetchAndStoreQuakes() {
   if (appState.isOffline) {
+    appState.liveQuakes = [];
+    syncActiveQuakes();
     appState.fetchError = "You are offline. SeismicLive is showing the latest saved Firestore data.";
     appState.syncMessage = "Offline - waiting to reconnect before checking USGS again.";
     updateSyncButton();
@@ -1594,7 +1584,7 @@ async function fetchAndStoreQuakes() {
   try {
     appState.isSyncing = true;
     appState.fetchError = "";
-    appState.syncMessage = "Syncing latest USGS feed...";
+    appState.syncMessage = "Refreshing the latest USGS feed...";
     updateSyncButton();
     renderDashboard();
 
@@ -1605,66 +1595,24 @@ async function fetchAndStoreQuakes() {
     }
 
     const data = await response.json();
-    const features = data.features ?? [];
+    const features = Array.isArray(data.features) ? data.features : [];
+    const liveQuakes = features.map(normalizeFeedFeature);
 
-    const writes = features.flatMap((feature) => {
-      const properties = feature.properties ?? {};
-      const magnitude = typeof properties.mag === "number" ? properties.mag : 0;
-      const location = properties.place ?? "Unknown location";
-      const id = feature.id;
-      const coordinates = feature.geometry?.coordinates ?? [];
-      const longitude = typeof coordinates[0] === "number" ? coordinates[0] : null;
-      const latitude = typeof coordinates[1] === "number" ? coordinates[1] : null;
-      const depth = typeof coordinates[2] === "number" ? coordinates[2] : null;
-      const quakeData = {
-        id,
-        magnitude,
-        location,
-        time: toFirestoreTimestamp(properties.time),
-        usgsId: id,
-        latitude,
-        longitude,
-        depth,
-        title: properties.title ?? "",
-        url: properties.url ?? "",
-        status: properties.status ?? "",
-        alert: properties.alert ?? "",
-        tsunami: typeof properties.tsunami === "number" ? properties.tsunami : 0
-      };
-
-      if (!shouldStoreQuake(quakeData)) {
-        return [];
-      }
-
-      return [
-        setDoc(doc(db, "quakes", id), {
-          magnitude: quakeData.magnitude,
-          location: quakeData.location,
-          time: quakeData.time,
-          usgsId: quakeData.usgsId,
-          latitude: quakeData.latitude,
-          longitude: quakeData.longitude,
-          depth: quakeData.depth,
-          title: quakeData.title,
-          url: quakeData.url,
-          status: quakeData.status,
-          alert: quakeData.alert,
-          tsunami: quakeData.tsunami
-        })
-      ];
-    });
-
-    await Promise.all(writes);
-    await enforceStorageLimits();
+    appState.liveQuakes = liveQuakes;
+    syncActiveQuakes();
+    appState.recentlyAddedIds = new Set();
+    appState.hasHydrated = true;
 
     appState.lastSuccessfulFetchAt = new Date();
-    appState.syncMessage = `USGS sync complete. ${features.length} events checked.`;
-    console.log(`${features.length} quakes written to Firestore`);
+    appState.syncMessage =
+      `USGS refresh complete. ${liveQuakes.length} live event${liveQuakes.length === 1 ? "" : "s"} loaded in the browser.`;
   } catch (error) {
+    appState.liveQuakes = [];
+    syncActiveQuakes();
     appState.fetchError =
       "USGS refresh failed. SeismicLive is continuing with saved Firestore data if available.";
     appState.syncMessage = appState.fetchError;
-    console.error("Error fetching and storing USGS quakes:", error);
+    console.error("Error fetching the live USGS feed:", error);
   } finally {
     appState.isSyncing = false;
     appState.isBootstrapping = false;
@@ -1673,110 +1621,26 @@ async function fetchAndStoreQuakes() {
   }
 }
 
-async function cleanupStoredQuakes(mode) {
-  const labels = {
-    "7": "older than 7 days",
-    "30": "older than 30 days",
-    "90": "older than 90 days",
-    all: "all stored quakes"
-  };
-
-  const confirmed = window.confirm(
-    `Delete ${labels[mode]} from Firestore? This action cannot be undone.`
-  );
-
-  if (!confirmed) {
-    setSettingsStatus("Cleanup canceled.");
-    return;
-  }
-
-  try {
-    setSettingsStatus("Cleaning up stored quakes...");
-
-    let cleanupQuery;
-
-    if (mode === "all") {
-      cleanupQuery = query(quakesCollection);
-    } else {
-      const days = Number(mode);
-      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      cleanupQuery = query(quakesCollection, where("time", "<", Timestamp.fromDate(cutoffDate)));
-    }
-
-    const snapshot = await getDocs(cleanupQuery);
-
-    if (snapshot.empty) {
-      setSettingsStatus(`No quakes matched the "${labels[mode]}" cleanup rule.`);
-      return;
-    }
-
-    await Promise.all(snapshot.docs.map((quakeDoc) => deleteDoc(doc(db, "quakes", quakeDoc.id))));
-
-    setSettingsStatus(`Deleted ${snapshot.size} quake records ${labels[mode]}.`);
-  } catch (error) {
-    console.error("Error cleaning Firestore quakes:", error);
-    setSettingsStatus("Cleanup failed. Check Firestore rules and console logs.");
-  }
-}
-
 function listenForQuakes() {
-  const quakesQuery = query(quakesCollection, orderBy("time", "desc"), limit(FIRESTORE_LIST_LIMIT));
+  if (quakesUnsubscribe) {
+    quakesUnsubscribe();
+  }
 
-  onSnapshot(
-    quakesQuery,
-    (snapshot) => {
-      appState.dataUpdatedAt = new Date();
+  const queryLimit = Math.max(FIRESTORE_LIST_LIMIT, appState.maxStoredDocs);
+  quakesUnsubscribe = subscribeToQuakes(
+    queryLimit,
+    (quakes) => {
+      appState.dataUpdatedAt = appState.lastSuccessfulFetchAt || new Date();
       appState.firestoreError = "";
       appState.isBootstrapping = false;
-      appState.quakes = snapshot.docs.map((quakeDoc) => {
-        const data = quakeDoc.data();
+      appState.cachedQuakes = quakes;
 
-        return {
-          id: quakeDoc.id,
-          magnitude: typeof data.magnitude === "number" ? data.magnitude : 0,
-          location: data.location ?? "Unknown location",
-          time: data.time,
-          latitude: typeof data.latitude === "number" ? data.latitude : null,
-          longitude: typeof data.longitude === "number" ? data.longitude : null,
-          depth: typeof data.depth === "number" ? data.depth : null,
-          title: data.title ?? "",
-          url: data.url ?? "",
-          status: data.status ?? "",
-          alert: data.alert ?? "",
-          tsunami: typeof data.tsunami === "number" ? data.tsunami : 0,
-          usgsId: data.usgsId ?? quakeDoc.id
-        };
-      });
-
-      const incomingIds = new Set(appState.quakes.map((quake) => quake.id));
-      const newQuakes = appState.quakes.filter((quake) => !appState.knownQuakeIds.has(quake.id));
-
-      appState.recentlyAddedIds = new Set(newQuakes.map((quake) => quake.id));
-
-      if (appState.hasHydrated && newQuakes.length) {
-        const strongestNew = newQuakes.reduce((currentStrongest, quake) => {
-          return quake.magnitude > currentStrongest.magnitude ? quake : currentStrongest;
-        }, newQuakes[0]);
-
-        showToast(
-          `${newQuakes.length} new quake${newQuakes.length > 1 ? "s" : ""} detected`,
-          `${strongestNew.location} reached M ${strongestNew.magnitude.toFixed(1)}.`
-        );
-
-        if (
-          typeof appState.notificationThreshold === "number" &&
-          appState.notificationThreshold > 0 &&
-          strongestNew.magnitude >= appState.notificationThreshold
-        ) {
-          showBrowserNotification(
-            `M ${strongestNew.magnitude.toFixed(1)} - ${strongestNew.location}`,
-            `Detected new earthquake at ${formatLocalTime(strongestNew.time)}`
-          );
-        }
+      if (!appState.liveQuakes.length) {
+        appState.quakes = appState.cachedQuakes;
       }
 
-      appState.knownQuakeIds = incomingIds;
       appState.hasHydrated = true;
+      updateDatabaseStatusCopy();
 
       if (!appState.quakes.some((quake) => quake.id === appState.selectedQuakeId)) {
         closeDetailModal();
@@ -1789,9 +1653,9 @@ function listenForQuakes() {
     },
     (error) => {
       appState.firestoreError = "Live Firestore listener failed.";
-      appState.syncMessage = "Live Firestore listener failed.";
       appState.isBootstrapping = false;
       console.error("Error listening for live Firestore updates:", error);
+      updateDatabaseStatusCopy();
       renderDashboard();
     }
   );
@@ -1874,12 +1738,6 @@ function setupOverviewControls() {
 }
 
 function setupSettingsControls() {
-  cleanupButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      cleanupStoredQuakes(button.dataset.cleanup);
-    });
-  });
-
   defaultRegionSelect.addEventListener("change", (event) => {
     appState.selectedRegion = event.target.value;
     updateRegionButtons();
@@ -1900,36 +1758,6 @@ function setupSettingsControls() {
       appState.autoSyncEnabled
         ? "Automatic refresh enabled."
         : "Automatic refresh disabled."
-    );
-  });
-
-  retentionDaysSelect.addEventListener("change", (event) => {
-    appState.retentionDays = Number(event.target.value);
-    saveSettings();
-    setSettingsStatus(`Automatic retention set to ${appState.retentionDays} days.`);
-  });
-
-  maxDocsSelect.addEventListener("change", (event) => {
-    appState.maxStoredDocs = Number(event.target.value);
-    saveSettings();
-    setSettingsStatus(`Maximum stored quake docs set to ${appState.maxStoredDocs}.`);
-  });
-
-  minMagSelect.addEventListener("change", (event) => {
-    appState.minStoredMagnitude = Number(event.target.value);
-    saveSettings();
-    setSettingsStatus(
-      `Only earthquakes with magnitude ${appState.minStoredMagnitude.toFixed(1)}+ will be stored from now on.`
-    );
-  });
-
-  storageScopeSelect.addEventListener("change", (event) => {
-    appState.storageScope = event.target.value;
-    saveSettings();
-    setSettingsStatus(
-      appState.storageScope === "philippines"
-        ? "New syncs will store Philippine-area quakes only."
-        : "New syncs will store global quakes."
     );
   });
 
@@ -2020,6 +1848,7 @@ async function init() {
   updateSyncButton();
   updateRegionButtons();
   updateSettingsControls();
+  updateDatabaseStatusCopy();
   renderDashboard();
   setupRegionControls();
   setupFilterControls();

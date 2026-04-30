@@ -1,42 +1,43 @@
 # SeismicLive
 
-SeismicLive is a browser dashboard for monitoring recent earthquakes from the USGS live feed with a Firestore-backed cache, Philippine-area focus controls, an interactive map, realtime updates, and an experimental predictive analytics layer.
+SeismicLive is a browser dashboard for monitoring recent earthquakes from the USGS live feed with a Firestore-backed fallback cache, Philippine-area focus controls, an interactive map, realtime updates, and an experimental predictive analytics layer.
 
 ## What It Does
 
-- Tracks recent earthquakes from the USGS daily GeoJSON feed.
-- Stores filtered quake records in Firestore for quick reloads and fallback viewing.
+- Fetches the current USGS daily GeoJSON feed directly in the browser.
+- Falls back to read-only Firestore quake data if the live feed fails or the user is offline.
 - Highlights Philippine-area activity with one-click focus controls.
 - Shows an interactive Leaflet map with clustered markers and modal drilldowns.
 - Supports sorting by newest, strongest, shallowest, or closest regional match.
 - Surfaces feed freshness, offline fallback states, and Firestore listener issues.
 - Includes an experimental predictive analytics outlook that scores recent activity and estimates short-term trend direction.
 
-## Emerging Tech Layer
+## Spark-Safe Architecture
 
-This project now goes beyond simply displaying USGS data. SeismicLive adds its own predictive analytics module that analyzes recent earthquake frequency, magnitude, and acceleration patterns to generate:
+This version is designed to stay on the Firebase Spark plan:
 
-- a 6-hour activity outlook
-- a live risk score
-- an hourly acceleration signal
-- a confidence rating based on recent event volume
+- live data comes straight from USGS in the browser
+- Firestore is optional and read-only in the deployed app
+- there are no Cloud Functions, admin claims, or paid-plan backend requirements
 
-This is presented as an experimental decision-support feature, not an exact earthquake prediction engine. That distinction matters: the app is applying analytics to live data to produce a new forecast signal, which is the emerging-tech component of the project.
+That keeps the project deployable without upgrading to Blaze.
 
 ## Project Files
 
 - `index.html`: Dashboard markup and UI structure.
 - `style.css`: Theme, layout, responsive, and component styling.
-- `app.js`: Dashboard orchestration, Firestore sync, UI rendering, map behavior, and predictive insight cards.
+- `app.js`: Dashboard orchestration, browser-side USGS fetch, Firestore fallback handling, UI rendering, and map behavior.
 - `utils.js`: Small testable formatting, filtering, sorting, trend helpers, and predictive analytics calculations.
+- `quake-feed-service.js`: Realtime Firestore subscription wrapper used by the dashboard.
 - `firebase-config.js`: Firebase app and Firestore connection settings.
-- `firestore.rules`: Recommended baseline production rules for a non-public write path.
+- `firestore.rules`: Read-only-friendly Firestore rules for public dashboard access.
 
 ## Setup
 
 1. Create a Firebase project with Firestore enabled.
 2. Update `firebase-config.js` with your Firebase web app credentials if you are not using the bundled project.
-3. Serve the project from a local web server. Example options:
+3. Deploy `firestore.rules` if you want Firestore fallback data available.
+4. Serve the project from a local web server. Example options:
 
 ```powershell
 python -m http.server 8000
@@ -48,11 +49,11 @@ or
 npx serve .
 ```
 
-4. Open the app in a browser at `http://localhost:8000` or the URL your local server prints.
+5. Open the app in a browser at `http://localhost:8000` or the URL your local server prints.
 
 ## Firestore Data Model
 
-The dashboard stores earthquake documents in a `quakes` collection using the USGS event id as the document id.
+If you use Firestore as a fallback cache, the dashboard expects a `quakes` collection using the USGS event id as the document id.
 
 Expected fields:
 
@@ -69,15 +70,14 @@ Expected fields:
 - `alert`
 - `tsunami`
 
-## Firebase Config Notes
+## Firebase Notes
 
-The current app fetches the USGS feed directly in the browser and writes documents to Firestore from the client. That is convenient for demos, but it is not the safest production model for a public site.
+The deployed app does not write to Firestore. It only:
 
-Recommended production direction:
+1. reads cached quake documents when they exist
+2. fetches live quake data from USGS in the browser
 
-1. Move the USGS ingest into a trusted backend such as Cloud Functions, Cloud Run, or another server job.
-2. Deploy the restrictive `firestore.rules` in this repo.
-3. Let the public dashboard keep read access only.
+That means you can stay on Spark as long as your Firestore usage stays within the free tier.
 
 ## Firestore Rules
 
@@ -86,10 +86,23 @@ Recommended production direction:
 - public reads are allowed for `quakes`
 - writes require an authenticated user with an `admin` custom claim
 
-That means the current browser-side sync flow will need one of these changes in production:
+For this Spark-safe version, public users only need the read access path.
 
-1. authenticated admin-only access for the sync path
-2. a backend ingest job that writes on behalf of the project
+## Deploy
+
+Deploy hosting and Firestore rules with:
+
+```powershell
+npm run deploy
+```
+
+## Tests
+
+Run the utility test suite with:
+
+```powershell
+npm test
+```
 
 ## Suggested Screenshots
 
@@ -97,11 +110,11 @@ Add these images when you want the repo page to feel more polished:
 
 1. Full dashboard view with the map and overview cards.
 2. Detail modal opened on a strong event.
-3. Settings panel showing retention and Firestore controls.
+3. Settings panel showing the Spark-safe Firestore fallback notes.
 
 ## Future Improvements
 
-- Move the USGS sync out of the browser and into a secure scheduled backend task.
-- Add automated tests around `utils.js`.
-- Add a deployment config such as `firebase.json` or a static-hosting workflow.
+- Add a small manual script for importing sample quake documents into Firestore before a demo.
+- Add automated tests around more of the dashboard rendering flow.
+- Add a static-hosting workflow for easier redeploys.
 - Add real screenshots or short demo clips to the README.

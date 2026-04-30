@@ -1,0 +1,12 @@
+{
+  "name": "seismiclive",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --input-type=module -e \"import('./utils.test.js')\"",
+    "deploy": "firebase deploy --only hosting,firestore"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.16.0"
+  }
+}

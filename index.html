@@ -4,23 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SeismicLive</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="./style.css" />
-  <!-- Leaflet map styles -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 </head>
 <body>
-  <!-- Main app container -->
   <div class="app-shell">
-    <!-- Header section shown at the top of the dashboard -->
     <header class="app-header">
       <div class="hero-copy">
         <p class="eyebrow">Live seismic activity feed</p>
-        <h1 class="main-title"><span class="brand-globe">&#127757;</span> <span class="brand-highlight">SeismicLive</span></h1>
+        <h1 class="main-title">
+          <span class="brand-globe">&#127757;</span>
+          <span class="brand-highlight">SeismicLive</span>
+        </h1>
         <p class="hero-tagline">Real-time global earthquake monitor</p>
         <p class="subtitle">
           Showing recent earthquakes from the USGS live feed, with a special
@@ -28,7 +31,6 @@
         </p>
       </div>
 
-      <!-- Spotlight panel for the strongest event currently on screen -->
       <aside class="hero-spotlight">
         <p class="spotlight-label">Strongest event</p>
         <div id="hero-highlight" class="hero-highlight">
@@ -109,7 +111,6 @@
       </section>
     </details>
 
-    <!-- Quick status note for students testing the project -->
     <section class="status-panel">
       <span class="status-dot"></span>
       <p id="live-status-copy">
@@ -119,7 +120,6 @@
       <span id="live-status-tag" class="status-tag">Auto refresh on</span>
     </section>
 
-    <!-- Live ticker gives the dashboard a constantly moving activity surface -->
     <section class="ticker-shell" aria-label="Live earthquake ticker">
       <p class="ticker-label">Live tape</p>
       <div class="ticker-track">
@@ -129,7 +129,6 @@
       </div>
     </section>
 
-    <!-- Summary cards provide an at-a-glance view of the latest activity -->
     <section id="overview-grid" class="overview-grid" aria-label="Earthquake overview">
       <button class="overview-card overview-button" data-metric-action="reset" type="button">
         <p class="overview-label">Tracked events</p>
@@ -172,7 +171,6 @@
       </div>
     </section>
 
-    <!-- Toolbar gives users control over region, magnitude, search, and syncing -->
     <section class="toolbar" aria-label="Dashboard controls">
       <div class="toolbar-stack">
         <div class="filter-group" role="group" aria-label="Region filters">
@@ -227,9 +225,15 @@
       </button>
     </section>
 
-    <!-- Interactive map showing recent earthquake locations -->
     <section id="map-section" class="map-section" aria-label="Earthquake map" role="region">
-      <div id="map" class="map-container" role="application" aria-label="Interactive earthquake map" tabindex="0" aria-describedby="map-legend"></div>
+      <div
+        id="map"
+        class="map-container"
+        role="application"
+        aria-label="Interactive earthquake map"
+        tabindex="0"
+        aria-describedby="map-legend"
+      ></div>
       <div id="map-legend" class="map-legend" aria-hidden="false">
         <p class="map-legend-title">Magnitude</p>
         <ul>
@@ -241,84 +245,37 @@
       </div>
     </section>
 
-    <!-- Quake cards are injected into this container by app.js -->
     <main id="alert-wall" class="alert-wall" aria-live="polite">
       <div class="empty-state">Loading recent earthquake activity...</div>
     </main>
   </div>
 
-    <!-- Floating utility dock keeps settings accessible without taking dashboard space -->
   <div class="floating-utility-stack" aria-label="Settings and database tools">
     <details class="settings-panel utility-flyout">
       <summary class="settings-summary">
-        <span class="utility-summary-icon" aria-hidden="true">🗂</span>
+        <span class="utility-summary-icon" aria-hidden="true">&#128451;</span>
         <span class="utility-summary-label">Database</span>
       </summary>
 
       <section class="settings-card">
-        <h2 class="settings-title">Cleanup Firestore</h2>
+        <h2 class="settings-title">Firestore Fallback</h2>
         <p class="settings-copy utility-copy">
-          Remove older earthquake records from Firestore to keep the project
-          database smaller and easier to manage.
+          This Spark-safe version reads live earthquakes directly from USGS in
+          the browser. Firestore stays optional and read-only as cached fallback
+          data when the live feed is unavailable.
         </p>
-        <div class="settings-actions">
-          <button class="settings-action danger-action" data-cleanup="7" type="button">
-            Delete older than 7 days
-          </button>
-          <button class="settings-action danger-action" data-cleanup="30" type="button">
-            Delete older than 30 days
-          </button>
-          <button class="settings-action danger-action" data-cleanup="90" type="button">
-            Delete older than 90 days
-          </button>
-          <button class="settings-action clear-action" data-cleanup="all" type="button">
-            Delete all stored quakes
-          </button>
+        <div class="settings-field">
+          <span class="settings-label">Spark plan status</span>
+          <p id="database-status-copy" class="settings-copy utility-copy">
+            Checking the Firestore fallback connection.
+          </p>
         </div>
-
-        <label class="settings-field" for="retention-days-select">
-          <span class="settings-label">Automatic retention</span>
-          <select id="retention-days-select" class="settings-select">
-            <option value="7">Keep only 7 days</option>
-            <option value="14">Keep only 14 days</option>
-            <option value="30" selected>Keep only 30 days</option>
-            <option value="90">Keep only 90 days</option>
-          </select>
-        </label>
-
-        <label class="settings-field" for="max-docs-select">
-          <span class="settings-label">Maximum stored quake docs</span>
-          <select id="max-docs-select" class="settings-select">
-            <option value="100">100 docs</option>
-            <option value="250">250 docs</option>
-            <option value="500" selected>500 docs</option>
-            <option value="1000">1000 docs</option>
-          </select>
-        </label>
-
-        <label class="settings-field" for="min-mag-select">
-          <span class="settings-label">Minimum magnitude to store</span>
-          <select id="min-mag-select" class="settings-select">
-            <option value="0">Store all magnitudes</option>
-            <option value="1.5">Store M 1.5+</option>
-            <option value="2.5" selected>Store M 2.5+</option>
-            <option value="4">Store M 4.0+</option>
-          </select>
-        </label>
-
-        <label class="settings-field" for="storage-scope-select">
-          <span class="settings-label">Storage scope</span>
-          <select id="storage-scope-select" class="settings-select">
-            <option value="global" selected>Store global quakes</option>
-            <option value="philippines">Store Philippine-area quakes only</option>
-          </select>
-        </label>
       </section>
     </details>
 
     <details class="settings-panel utility-flyout">
       <summary class="settings-summary">
-        <span class="utility-summary-icon" aria-hidden="true">⚙</span>
+        <span class="utility-summary-icon" aria-hidden="true">&#9881;</span>
         <span class="utility-summary-label">Settings</span>
       </summary>
 
@@ -337,7 +294,7 @@
         </label>
 
         <label class="settings-field" for="notification-threshold-select">
-          <span class="settings-label">Notify for magnitude >=</span>
+          <span class="settings-label">Notify for magnitude &gt;=</span>
           <select id="notification-threshold-select" class="settings-select">
             <option value="0">Off</option>
             <option value="3">M 3+</option>
@@ -361,7 +318,6 @@
     </details>
   </div>
 
-  <!-- Detail modal opens when a user clicks a quake card -->
   <div id="detail-modal" class="detail-modal" hidden>
     <div id="detail-backdrop" class="detail-backdrop"></div>
     <section
@@ -380,10 +336,8 @@
     </section>
   </div>
 
-  <!-- Toasts provide lightweight feedback when new quakes arrive or actions succeed -->
   <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- Floating theme switch stays visible while scrolling -->
   <button
     id="theme-toggle-button"
     class="theme-toggle-button"
@@ -394,7 +348,6 @@
     <span class="theme-toggle-icon theme-toggle-moon" aria-hidden="true"></span>
   </button>
 
-  <!-- Main app logic loaded as an ES module -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script type="module" src="./app.js"></script>
